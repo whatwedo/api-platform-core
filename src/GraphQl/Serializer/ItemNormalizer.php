@@ -13,9 +13,21 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\GraphQl\Serializer;
 
+use ApiPlatform\Core\Api\IdentifiersExtractorInterface;
+use ApiPlatform\Core\Api\IriConverterInterface;
+use ApiPlatform\Core\Api\ResourceClassResolverInterface;
+use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
+use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
+use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\PropertyMetadata;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Serializer\ItemNormalizer as BaseItemNormalizer;
 use ApiPlatform\Core\Util\ClassInfoTrait;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
+use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 use Symfony\Component\Serializer\Exception\UnexpectedValueException;
 
 /**
@@ -28,7 +40,17 @@ final class ItemNormalizer extends BaseItemNormalizer
     use ClassInfoTrait;
 
     public const FORMAT = 'graphql';
-    public const ITEM_KEY = '#item';
+    public const ITEM_RESOURCE_CLASS_KEY = '#itemResourceClass';
+    public const ITEM_IDENTIFIERS_KEY = '#itemIdentifiers';
+
+    private $identifiersExtractor;
+
+    public function __construct(PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, IriConverterInterface $iriConverter, IdentifiersExtractorInterface $identifiersExtractor, ResourceClassResolverInterface $resourceClassResolver, PropertyAccessorInterface $propertyAccessor = null, NameConverterInterface $nameConverter = null, ClassMetadataFactoryInterface $classMetadataFactory = null, ItemDataProviderInterface $itemDataProvider = null, bool $allowPlainIdentifiers = false, LoggerInterface $logger = null, iterable $dataTransformers = [], ResourceMetadataFactoryInterface $resourceMetadataFactory = null, $allowUnmappedClass = false)
+    {
+        parent::__construct($propertyNameCollectionFactory, $propertyMetadataFactory, $iriConverter, $resourceClassResolver, $propertyAccessor, $nameConverter, $classMetadataFactory, $itemDataProvider, $allowPlainIdentifiers, $logger ?: new NullLogger(), $dataTransformers, $resourceMetadataFactory, $allowUnmappedClass);
+
+        $this->identifiersExtractor = $identifiersExtractor;
+    }
 
     /**
      * {@inheritdoc}
@@ -54,7 +76,8 @@ final class ItemNormalizer extends BaseItemNormalizer
             throw new UnexpectedValueException('Expected data to be an array');
         }
 
-	    $data[self::ITEM_KEY] = serialize($this->cloneToEmptyObject($object)); // calling serialize prevent weird normalization process done by Webonyx's GraphQL PHP
+	    $data[self::ITEM_RESOURCE_CLASS_KEY] = $this->getObjectClass($object);
+        $data[self::ITEM_IDENTIFIERS_KEY] = $this->identifiersExtractor->getIdentifiersFromItem($object);
 
         return $data;
     }
@@ -102,40 +125,4 @@ final class ItemNormalizer extends BaseItemNormalizer
 
         parent::setAttributeValue($object, $attribute, $value, $format, $context);
     }
-
-	/**
-	 * Return object of passed type with all empty fields except id.
-	 * Necessary to speed up serialization/deserialization on Webonyx side.
-	 *
-	 * @param object $originalObject
-	 *
-	 * @return object
-	 */
-	private function cloneToEmptyObject($originalObject)
-	{
-		$class = \get_class($originalObject);
-		$emptyObject = new $class;
-
-		try {
-			$reflectionClass = new \ReflectionClass($class);
-			$idProperty = $reflectionClass->getProperty('id');
-
-			// For audit entities
-			if ($reflectionClass->hasProperty('revision')) {
-				$revProperty = $reflectionClass->getProperty('revision');
-			}
-		} catch (\ReflectionException $e) {
-			return $originalObject;
-		}
-
-		$idProperty->setAccessible(true);
-		$idProperty->setValue($emptyObject, $idProperty->getValue($originalObject));
-
-		if (isset($revProperty)) {
-			$revProperty->setAccessible(true);
-			$revProperty->setValue($emptyObject, $revProperty->getValue($originalObject));
-		}
-
-		return $emptyObject;
-	}
 }

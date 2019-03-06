@@ -25,7 +25,6 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\ResolveInfo;
-use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
@@ -79,21 +78,19 @@ class CollectionResolverFactoryTest extends TestCase
      */
     public function testCreateSubresourceCollectionResolverNoPagination(array $subcollection, array $expected)
     {
+        $identifiers = ['id' => 1];
         $factory = $this->createCollectionResolverFactory([
             'Object1',
             'Object2',
-        ], $subcollection, ['id' => 1], false);
+        ], $subcollection, $identifiers, false);
 
         $resolver = $factory(RelatedDummy::class, Dummy::class, 'operationName');
 
         $resolveInfo = new ResolveInfo('relatedDummies', [], new ObjectType(['name' => '']), new ObjectType(['name' => '']), [], new Schema([]), [], null, null, []);
 
-        $dummy = new Dummy();
-        $dummy->setId(1);
-
         $source = [
             'relatedDummies' => [],
-            ItemNormalizer::ITEM_KEY => serialize($dummy),
+            ItemNormalizer::ITEM_IDENTIFIERS_KEY => $identifiers,
         ];
 
         $this->assertEquals($expected, $resolver($source, [], null, $resolveInfo));
@@ -205,9 +202,6 @@ class CollectionResolverFactoryTest extends TestCase
             $normalizerProphecy->normalize($object, Argument::cetera())->willReturn('normalized'.$object);
         }
 
-        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
-        $identifiersExtractorProphecy->getIdentifiersFromItem(Argument::type(Dummy::class))->willReturn($identifiers);
-
         $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
         $resourceMetadataFactoryProphecy->create(RelatedDummy::class)->willReturn(new ResourceMetadata('RelatedDummy', null, null, null, null, ['normalization_context' => ['groups' => ['foo']]]));
 
@@ -220,7 +214,6 @@ class CollectionResolverFactoryTest extends TestCase
             $collectionDataProviderProphecy->reveal(),
             $subresourceDataProviderProphecy->reveal(),
             $normalizerProphecy->reveal(),
-            $identifiersExtractorProphecy->reveal(),
             $resourceMetadataFactoryProphecy->reveal(),
             null,
             $requestStack,
