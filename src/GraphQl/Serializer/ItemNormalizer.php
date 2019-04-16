@@ -45,7 +45,7 @@ final class ItemNormalizer extends BaseItemNormalizer
      */
     public function normalize($object, $format = null, array $context = [])
     {
-        if (!$this->handleNonResource && null !== $outputClass = $this->getOutputClass($this->getObjectClass($object), $context)) {
+        if (null !== $outputClass = $this->getOutputClass($this->getObjectClass($object), $context)) {
             return parent::normalize($object, $format, $context);
         }
 
@@ -54,16 +54,7 @@ final class ItemNormalizer extends BaseItemNormalizer
             throw new UnexpectedValueException('Expected data to be an array');
         }
 
-        if ($this->handleNonResource) {
-            // when using an output class, get the IRI from the resource
-            if (isset($context['api_resource']) && isset($data['id'])) {
-                $data['_id'] = $data['id'];
-                $data['id'] = $this->iriConverter->getIriFromItem($context['api_resource']);
-                unset($context['api_resource']);
-            }
-        }
-
-        $data[self::ITEM_KEY] = serialize($object); // calling serialize prevent weird normalization process done by Webonyx's GraphQL PHP
+	    $data[self::ITEM_KEY] = serialize($this->cloneToEmptyObject($object)); // calling serialize prevent weird normalization process done by Webonyx's GraphQL PHP
 
         return $data;
     }
@@ -111,4 +102,40 @@ final class ItemNormalizer extends BaseItemNormalizer
 
         parent::setAttributeValue($object, $attribute, $value, $format, $context);
     }
+
+	/**
+	 * Return object of passed type with all empty fields except id.
+	 * Necessary to speed up serialization/deserialization on Webonyx side.
+	 *
+	 * @param object $originalObject
+	 *
+	 * @return object
+	 */
+	private function cloneToEmptyObject($originalObject)
+	{
+		$class = \get_class($originalObject);
+		$emptyObject = new $class;
+
+		try {
+			$reflectionClass = new \ReflectionClass($class);
+			$idProperty = $reflectionClass->getProperty('id');
+
+			// For audit entities
+			if ($reflectionClass->hasProperty('revision')) {
+				$revProperty = $reflectionClass->getProperty('revision');
+			}
+		} catch (\ReflectionException $e) {
+			return $originalObject;
+		}
+
+		$idProperty->setAccessible(true);
+		$idProperty->setValue($emptyObject, $idProperty->getValue($originalObject));
+
+		if (isset($revProperty)) {
+			$revProperty->setAccessible(true);
+			$revProperty->setValue($emptyObject, $revProperty->getValue($originalObject));
+		}
+
+		return $emptyObject;
+	}
 }
