@@ -516,8 +516,10 @@ final class SchemaBuilder implements SchemaBuilderInterface
             return $fields;
         }
 
-        if (!$input || 'create' !== $mutationName) {
+        if (!$input || \in_array($mutationName, ['update', 'delete'], true)) {
             $fields['id'] = $idField;
+        } elseif ('create' !== $mutationName) {
+            $fields['id'] = ['type' => GraphQLType::id()];
         }
 
         ++$depth; // increment the depth for the call to getResourceFieldConfiguration.
