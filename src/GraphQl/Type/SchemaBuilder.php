@@ -353,10 +353,12 @@ final class SchemaBuilder implements SchemaBuilderInterface
             case Type::BUILTIN_TYPE_STRING:
                 $graphqlType = GraphQLType::string();
                 break;
-            case Type::BUILTIN_TYPE_ARRAY:
-            case Type::BUILTIN_TYPE_ITERABLE:
-                $graphqlType = $this->graphqlTypes['Iterable'];
-                break;
+	        case Type::BUILTIN_TYPE_ARRAY:
+	        case Type::BUILTIN_TYPE_ITERABLE:
+	        if (!$this->isArrayOfObjects($type)) {
+			        $graphqlType = $this->graphqlTypes['Iterable'];
+			        break;
+		        }
             case Type::BUILTIN_TYPE_OBJECT:
                 if (($input && $depth > 0) || is_a($type->getClassName(), \DateTimeInterface::class, true)) {
                     $graphqlType = GraphQLType::string();
@@ -390,6 +392,20 @@ final class SchemaBuilder implements SchemaBuilderInterface
 
         return $type->isNullable() || (null !== $mutationName && 'update' === $mutationName) ? $graphqlType : GraphQLType::nonNull($graphqlType);
     }
+
+	/**
+	 * Necessary to determine that we are working with array of custom objects.
+	 *
+	 * @param Type $type
+	 *
+	 * @return bool
+	 */
+	private function isArrayOfObjects(Type $type): bool
+	{
+		return Type::BUILTIN_TYPE_ARRAY === $type->getBuiltinType() &&
+			$type->getCollectionValueType() &&
+			Type::BUILTIN_TYPE_OBJECT === $type->getCollectionValueType()->getBuiltinType();
+	}
 
     /**
      * Gets the object type of the given resource.
@@ -569,8 +585,8 @@ final class SchemaBuilder implements SchemaBuilderInterface
         return $this->graphqlTypes["{$shortName}Connection"] = new ObjectType($configuration);
     }
 
-    private function isCollection(Type $type): bool
-    {
-        return $type->isCollection() && Type::BUILTIN_TYPE_OBJECT === $type->getBuiltinType();
-    }
+	private function isCollection(Type $type): bool
+	{
+		return ($type->isCollection() && Type::BUILTIN_TYPE_OBJECT === $type->getBuiltinType()) || $this->isArrayOfObjects($type);
+	}
 }
