@@ -564,7 +564,26 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer implement
             throw new RuntimeException(sprintf('The injected serializer must be an instance of "%s".', NormalizerInterface::class));
         }
 
-        return $this->serializer->normalize($attributeValue, $format, $context);
+	    return $this->serializer->normalize($attributeValue, $format, $this->getAttributeContext($context, $attribute));
+    }
+
+	/**
+	 * @param array  $context
+	 * @param string $attribute
+	 *
+	 * @return array
+	 */
+	private function getAttributeContext(array $context, string $attribute): array
+    {
+	    if (isset($context[self::ATTRIBUTES][$attribute])) {
+		    $context[self::ATTRIBUTES] = $context[self::ATTRIBUTES][$attribute];
+	    }
+
+	    if (isset($context[self::ATTRIBUTES]['edges'])) {
+		    $context[self::ATTRIBUTES] = $context[self::ATTRIBUTES]['edges']['node'];
+	    }
+
+	    return $context;
     }
 
     /**
