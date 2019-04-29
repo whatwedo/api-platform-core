@@ -82,7 +82,7 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
             $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
             $wrapFieldName = lcfirst($resourceMetadata->getShortName());
             $normalizationContext = $resourceMetadata->getGraphqlAttribute($operationName ?? '', 'normalization_context', [], true);
-            $normalizationContext['attributes'] = $this->fieldsToAttributes($info)[$wrapFieldName] ?? [];
+            $normalizationContext['attributes'] = $this->fieldsToAttributes($info)[$wrapFieldName] ?? $this->fieldsToAttributes($info);;
 
             if (isset($args['input']['id'])) {
                 try {
