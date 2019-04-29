@@ -108,6 +108,16 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
                 $inputClass = $inputMetadata['class'];
             }
 
+            $outputMetadata = $resourceMetadata->getGraphqlAttribute($operationName, 'output', null, true);
+            $outputClass = null;
+            if (\is_array($outputMetadata) && \array_key_exists('class', $outputMetadata)) {
+                if (null === $outputMetadata['class']) {
+                    return $data;
+                }
+
+                $outputClass = $outputMetadata['class'];
+            }
+
             if ('delete' === $operationName) {
                 if ($item) {
                     $this->dataPersister->remove($item);
@@ -145,7 +155,12 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
                 }
             }
 
-            return [$wrapFieldName => $this->normalizer->normalize($persistResult ?? $item, ItemNormalizer::FORMAT, $normalizationContext)] + $data;
+            $normalizedItem =
+                $this->normalizer->normalize($persistResult ?? $item, ItemNormalizer::FORMAT, $normalizationContext);
+
+            if($outputClass !== null) return $normalizedItem + $data;
+
+            return [$wrapFieldName => $normalizedItem] + $data;
         };
     }
 
