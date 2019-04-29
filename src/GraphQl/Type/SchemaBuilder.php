@@ -212,6 +212,7 @@ final class SchemaBuilder implements SchemaBuilderInterface
             $fieldConfiguration['args'] += ['input' => $this->getResourceFieldConfiguration($resourceClass, $resourceMetadata, null, $deprecationReason, $resourceType, $resourceClass, true, null, $mutationName)];
 
             if (!$this->isCollection($resourceType)) {
+
                 $fieldConfiguration['resolve'] = ($this->itemMutationResolverFactory)($resourceClass, null, $mutationName);
             }
         }
@@ -452,24 +453,29 @@ final class SchemaBuilder implements SchemaBuilderInterface
             return $this->graphqlTypes[$shortName];
         }
 
+        $wrapData = !$wrapped && null !== $mutationName && !$input && $depth < 1;
+        $hasCustomClass = false;
+
         $ioMetadata = $resourceMetadata->getGraphqlAttribute(null === $mutationName ? 'query' : $mutationName, $input ? 'input' : 'output', null, true);
         if (null !== $ioMetadata && \array_key_exists('class', $ioMetadata) && null !== $ioMetadata['class']) {
             $resourceClass = $ioMetadata['class'];
+            $hasCustomClass = true;
+            $wrapData = false;
         }
-
-        $wrapData = !$wrapped && null !== $mutationName && !$input && $depth < 1;
 
         $configuration = [
             'name' => $shortName,
             'description' => $resourceMetadata->getDescription(),
             'resolveField' => $this->defaultFieldResolver,
-            'fields' => function () use ($resourceClass, $resourceMetadata, $input, $mutationName, $queryName, $wrapData, $depth, $ioMetadata) {
+            'fields' => function () use ($hasCustomClass, $resourceClass, $resourceMetadata, $input, $mutationName, $queryName, $wrapData, $depth, $ioMetadata) {
                 if ($wrapData) {
+
                     $queryNormalizationContext = $resourceMetadata->getGraphqlAttribute($queryName ?? 'query', 'normalization_context', [], true);
                     $mutationNormalizationContext = $resourceMetadata->getGraphqlAttribute($mutationName ?? '', 'normalization_context', [], true);
                     // Use a new type for the wrapped object only if there is a specific normalization context for the mutation.
                     // If not, use the query type in order to ensure the client cache could be used.
                     $useWrappedType = $queryNormalizationContext !== $mutationNormalizationContext;
+                    if($hasCustomClass) $useWrappedType = false;
 
                     return [
                         lcfirst($resourceMetadata->getShortName()) => $useWrappedType ?
@@ -481,7 +487,7 @@ final class SchemaBuilder implements SchemaBuilderInterface
 
                 return $this->getResourceObjectTypeFields($resourceClass, $resourceMetadata, $input, $queryName, $mutationName, $depth, $ioMetadata);
             },
-            'interfaces' => $wrapData ? [] : [$this->getNodeInterface()],
+            'interfaces' => $wrapData || $hasCustomClass ? [] : [$this->getNodeInterface()],
         ];
 
         return $this->graphqlTypes[$shortName] = $input ? GraphQLType::nonNull(new InputObjectType($configuration)) : new ObjectType($configuration);
