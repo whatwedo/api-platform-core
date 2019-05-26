@@ -129,11 +129,11 @@ final class SchemaBuilder implements SchemaBuilderInterface
                 ],
             ],
             'resolveType' => function ($value) {
-                if (!isset($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY])) {
+                if (!isset($value[ItemNormalizer::ITEM_KEY])) {
                     return null;
                 }
 
-                $shortName = (new \ReflectionClass($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY]))->getShortName();
+                $shortName = (new \ReflectionObject(unserialize($value[ItemNormalizer::ITEM_KEY])))->getShortName();
 
                 return $this->graphqlTypes[$shortName] ?? null;
             },
