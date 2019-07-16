@@ -81,11 +81,12 @@ final class CollectionResolverFactory implements ResolverFactoryInterface
 
             if (isset($rootClass, $source[$rootProperty = $info->fieldName], $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY])) {
                 $rootResolvedFields = $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY];
-                $subresource = $this->getSubresource($rootClass, $rootResolvedFields, array_keys($rootResolvedFields), $rootProperty, $resourceClass, true, $dataProviderContext);
-	            $collection = empty($subresource) ? $source[$rootProperty] ?? [] : $subresource;
+	            $collection = $this->getSubresource($rootClass, $rootResolvedFields, array_keys($rootResolvedFields), $rootProperty, $resourceClass, true, $dataProviderContext);
             } else {
-                $collection = $this->collectionDataProvider->getCollection($resourceClass, null, $dataProviderContext);
+	            $collection = $this->collectionDataProvider->getCollection($resourceClass, null, $dataProviderContext);
             }
+
+	        $collection = empty($collection) ? $source[$rootProperty] ?? [] : $collection;
 
             $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, $collection, $operationName ?? 'query');
 
