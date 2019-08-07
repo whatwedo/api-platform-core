@@ -26,13 +26,13 @@ install:
   - echo extension=php_mongodb.dll >> php.ini
   - echo memory_limit=3G >> php.ini
   - cd %APPVEYOR_BUILD_FOLDER%
-  - composer install --no-interaction --no-progress --no-suggest --ignore-platform-reqs
+  - composer install --no-progress --no-suggest --no-interaction
 
 services:
   - mongodb
 
 test_script:
   - cd %APPVEYOR_BUILD_FOLDER%
-  - php vendor\behat\behat\bin\behat --format=progress --suite=default
+  - php vendor\behat\behat\bin\behat --format=progress --suite=default --no-interaction
   - rmdir tests\Fixtures\app\var\cache /s /q
   - php vendor\phpunit\phpunit\phpunit

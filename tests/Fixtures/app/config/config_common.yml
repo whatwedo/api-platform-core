@@ -8,8 +8,6 @@ framework:
     session:
         storage_id:                    'session.storage.mock_file'
     form:                              ~ # For FOSUser
-    templating:
-        engines:                       ['twig'] # For Swagger UI
     profiler:
         enabled:                        true
         collect:                        false
@@ -29,13 +27,6 @@ doctrine:
     orm:
         auto_generate_proxy_classes:   '%kernel.debug%'
         auto_mapping:                  true
-
-doctrine_mongodb:
-    connections:
-        default:                       ~
-    document_managers:
-        default:
-            auto_mapping:              true
 
 twig:
     strict_variables: '%kernel.debug%'
@@ -89,10 +80,13 @@ api_platform:
 parameters:
     container.autowiring.strict_mode: true
     container.dumper.inline_class_loader: true
-    # Enable the metadata cache to speedup the builds
-    api_platform.metadata_cache: true
 
 services:
+    ApiPlatform\Core\Tests\Fixtures\TestBundle\MessageHandler\:
+        resource: '../../TestBundle/MessageHandler'
+        autowire: true
+        autoconfigure: true
+
     contain_non_resource.item_data_provider:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataProvider\ContainNonResourceItemDataProvider'
         public: false
@@ -135,6 +129,10 @@ services:
     ApiPlatform\Core\Tests\Fixtures\TestBundle\Filter\ArrayRequiredFilter:
         arguments: ['@doctrine']
         tags: ['api_platform.filter']
+
+    ApiPlatform\Core\Tests\Fixtures\TestBundle\Controller\:
+        resource: '../../TestBundle/Controller'
+        tags: ['controller.service_arguments']
 
     app.config_dummy_resource.action:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\Action\ConfigCustom'
@@ -229,6 +227,12 @@ services:
         tags:
             -  { name: 'api_platform.data_transformer' }
 
+    app.data_transformer.dummy_dto_no_input_to_output_dto:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\DummyDtoNoInputToOutputDtoDataTransformer'
+        public: false
+        tags:
+            -  { name: 'api_platform.data_transformer' }
+
     app.data_transformer.recover_password_input:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\RecoverPasswordInputDataTransformer'
         public: false
@@ -240,3 +244,9 @@ services:
         public: false
         tags:
             -  { name: 'api_platform.data_transformer' }
+
+    app.messenger_handler.messenger_with_response:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\MessengerHandler\MessengerWithResponseHandler'
+        public: false
+        tags:
+            -  { name: 'messenger.message_handler' }

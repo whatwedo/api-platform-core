@@ -20,10 +20,11 @@ use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
 use ApiPlatform\Core\Exception\InvalidIdentifierException;
 use ApiPlatform\Core\Exception\RuntimeException;
 use ApiPlatform\Core\Identifier\IdentifierConverterInterface;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
+use ApiPlatform\Core\Metadata\Resource\ToggleableOperationAttributeTrait;
 use ApiPlatform\Core\Serializer\SerializerContextBuilderInterface;
 use ApiPlatform\Core\Util\RequestAttributesExtractor;
 use ApiPlatform\Core\Util\RequestParser;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -35,16 +36,20 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 final class ReadListener
 {
     use OperationDataProviderTrait;
+    use ToggleableOperationAttributeTrait;
+
+    public const OPERATION_ATTRIBUTE_KEY = 'read';
 
     private $serializerContextBuilder;
 
-    public function __construct(CollectionDataProviderInterface $collectionDataProvider, ItemDataProviderInterface $itemDataProvider, SubresourceDataProviderInterface $subresourceDataProvider = null, SerializerContextBuilderInterface $serializerContextBuilder = null, IdentifierConverterInterface $identifierConverter = null)
+    public function __construct(CollectionDataProviderInterface $collectionDataProvider, ItemDataProviderInterface $itemDataProvider, SubresourceDataProviderInterface $subresourceDataProvider = null, SerializerContextBuilderInterface $serializerContextBuilder = null, IdentifierConverterInterface $identifierConverter = null, ResourceMetadataFactoryInterface $resourceMetadataFactory = null)
     {
         $this->collectionDataProvider = $collectionDataProvider;
         $this->itemDataProvider = $itemDataProvider;
         $this->subresourceDataProvider = $subresourceDataProvider;
         $this->serializerContextBuilder = $serializerContextBuilder;
         $this->identifierConverter = $identifierConverter;
+        $this->resourceMetadataFactory = $resourceMetadataFactory;
     }
 
     /**
@@ -52,12 +57,14 @@ final class ReadListener
      *
      * @throws NotFoundHttpException
      */
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(GetResponseEvent $event): void
     {
         $request = $event->getRequest();
         if (
             !($attributes = RequestAttributesExtractor::extractAttributes($request))
             || !$attributes['receive']
+            || $request->isMethod('POST') && isset($attributes['collection_operation_name'])
+            || $this->isOperationAttributeDisabled($attributes, self::OPERATION_ATTRIBUTE_KEY)
         ) {
             return;
         }
@@ -75,7 +82,7 @@ final class ReadListener
         }
 
         if (isset($attributes['collection_operation_name'])) {
-            $request->attributes->set('data', $request->isMethod('POST') ? null : $this->getCollectionData($attributes, $context));
+            $request->attributes->set('data', $this->getCollectionData($attributes, $context));
 
             return;
         }
@@ -108,5 +115,6 @@ final class ReadListener
         }
 
         $request->attributes->set('data', $data);
+        $request->attributes->set('previous_data', \is_object($data) ? clone $data : $data);
     }
 }

@@ -23,7 +23,7 @@ class ResourceListTest extends TestCase
      */
     private $resourceList;
 
-    public function setUp()
+    protected function setUp(): void
     {
         $this->resourceList = new ResourceList();
     }

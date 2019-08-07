@@ -22,6 +22,7 @@ use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\AggregationItemExtensi
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\FilterExtension as MongoDbOdmFilterExtension;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\OrderExtension as MongoDbOdmOrderExtension;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\PaginationExtension as MongoDbOdmPaginationExtension;
+use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\AbstractFilter as DoctrineMongoDbOdmAbstractFilter;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\BooleanFilter as MongoDbOdmBooleanFilter;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\DateFilter as MongoDbOdmDateFilter;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\ExistsFilter as MongoDbOdmExistsFilter;
@@ -36,6 +37,7 @@ use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\OrderExtension;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryItemExtensionInterface;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\AbstractContextAwareFilter as DoctrineOrmAbstractContextAwareFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\DateFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\ExistsFilter;
@@ -57,7 +59,6 @@ use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
 use ApiPlatform\Core\DataTransformer\DataTransformerInterface;
 use ApiPlatform\Core\Exception\FilterValidationException;
 use ApiPlatform\Core\Exception\InvalidArgumentException;
-use ApiPlatform\Core\Exception\RuntimeException;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
@@ -76,25 +77,32 @@ use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Prophecy\Exception\Doubler\MethodNotFoundException;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Resource\DirectoryResource;
 use Symfony\Component\Config\Resource\ResourceInterface;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Exception\RuntimeException;
 use Symfony\Component\DependencyInjection\Extension\ConfigurationExtensionInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
+use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 
 /**
+ * @group resource-hog
+ *
  * @author Kévin Dunglas <dunglas@gmail.com>
  */
 class ApiPlatformExtensionTest extends TestCase
 {
-    const DEFAULT_CONFIG = ['api_platform' => [
+    public const DEFAULT_CONFIG = ['api_platform' => [
         'title' => 'title',
         'description' => 'description',
         'version' => 'version',
@@ -122,20 +130,23 @@ class ApiPlatformExtensionTest extends TestCase
                 ],
             ],
         ]],
+        'doctrine_mongodb_odm' => [
+            'enabled' => false,
+        ],
     ]];
 
     private $extension;
     private $childDefinitionProphecy;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->extension = new ApiPlatformExtension();
         $this->childDefinitionProphecy = $this->prophesize(ChildDefinition::class);
     }
 
-    public function tearDown()
+    protected function tearDown(): void
     {
-        unset($this->extension);
+        $this->extension = null;
     }
 
     public function testConstruct()
@@ -147,61 +158,33 @@ class ApiPlatformExtensionTest extends TestCase
         $this->assertInstanceOf(ConfigurationExtensionInterface::class, $this->extension);
     }
 
-    public function testNotPrependWhenNull()
+    public function testPrependWhenNoFrameworkExtension()
     {
         $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
-        $containerBuilderProphecy->getExtensionConfig('framework')->willReturn(null)->shouldBeCalled();
+        $containerBuilderProphecy->getExtensions()->willReturn([]);
         $containerBuilderProphecy->prependExtensionConfig('framework', Argument::type('array'))->shouldNotBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('api_platform', Argument::type('array'))->shouldNotBeCalled();
-        $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->prepend($containerBuilder);
+        $this->extension->prepend($containerBuilderProphecy->reveal());
     }
 
-    public function testNotPrependSerializerWhenConfigExist()
+    public function testPrepend()
     {
+        $frameworkExtensionProphecy = $this->prophesize(ExtensionInterface::class);
+
         $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
-        $containerBuilderProphecy->getExtensionConfig('framework')->willReturn([0 => ['serializer' => ['enabled' => false]]])->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::any())->willReturn(null)->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::that(function (array $config) {
-            return \array_key_exists('serializer', $config);
-        }))->shouldNotBeCalled();
-        $containerBuilder = $containerBuilderProphecy->reveal();
+        $containerBuilderProphecy->getExtensions()->willReturn(['framework' => $frameworkExtensionProphecy->reveal()]);
+        $containerBuilderProphecy->prependExtensionConfig('framework', [
+            'serializer' => [
+                'enabled' => true,
+            ],
+        ])->shouldBeCalled();
+        $containerBuilderProphecy->prependExtensionConfig('framework', [
+            'property_info' => [
+                'enabled' => true,
+            ],
+        ])->shouldBeCalled();
 
-        $this->extension->prepend($containerBuilder);
-    }
-
-    public function testNotPrependPropertyInfoWhenConfigExist()
-    {
-        $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
-        $containerBuilderProphecy->getExtensionConfig('framework')->willReturn([0 => ['property_info' => ['enabled' => false]]])->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::any())->willReturn(null)->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::that(function (array $config) {
-            return \array_key_exists('property_info', $config);
-        }))->shouldNotBeCalled();
-        $containerBuilder = $containerBuilderProphecy->reveal();
-
-        $this->extension->prepend($containerBuilder);
-    }
-
-    public function testPrependWhenNotConfigured()
-    {
-        $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
-        $containerBuilderProphecy->getExtensionConfig('framework')->willReturn([])->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::type('array'))->shouldNotBeCalled();
-        $containerBuilder = $containerBuilderProphecy->reveal();
-
-        $this->extension->prepend($containerBuilder);
-    }
-
-    public function testPrependWhenNotEnabled()
-    {
-        $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
-        $containerBuilderProphecy->getExtensionConfig('framework')->willReturn([0 => ['serializer' => []]])->shouldBeCalled();
-        $containerBuilderProphecy->prependExtensionConfig('framework', Argument::type('array'))->shouldBeCalled();
-        $containerBuilder = $containerBuilderProphecy->reveal();
-
-        $this->extension->prepend($containerBuilder);
+        $this->extension->prepend($containerBuilderProphecy->reveal());
     }
 
     public function testLoadDefaultConfig()
@@ -213,6 +196,23 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilder = $containerBuilderProphecy->reveal();
 
         $this->extension->load(self::DEFAULT_CONFIG, $containerBuilder);
+    }
+
+    /**
+     * @group mongodb
+     */
+    public function testLoadDefaultConfigWithOdm()
+    {
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy(['odm']);
+        $containerBuilderProphecy->setParameter('api_platform.enable_swagger', '1')->shouldBeCalled();
+        $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
+        $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
+        $containerBuilder = $containerBuilderProphecy->reveal();
+
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['doctrine_mongodb_odm']['enabled'] = true;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testSetNameConverter()
@@ -227,7 +227,10 @@ class ApiPlatformExtensionTest extends TestCase
 
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['name_converter' => $nameConverterId]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['name_converter'] = $nameConverterId;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testEnableFosUser()
@@ -244,7 +247,10 @@ class ApiPlatformExtensionTest extends TestCase
 
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['enable_fos_user' => true]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['enable_fos_user'] = true;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testDisableProfiler()
@@ -253,7 +259,10 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilder = $containerBuilderProphecy->reveal();
         $containerBuilderProphecy->setDefinition('api_platform.data_collector.request', Argument::type(Definition::class))->shouldNotBeCalled();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['enable_profiler' => false]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['enable_profiler'] = false;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testEnableProfilerWithDebug()
@@ -267,7 +276,10 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->setDefinition('debug.api_platform.data_persister', Argument::type(Definition::class))->shouldBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['enable_profiler' => true]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['enable_profiler'] = true;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testFosUserPriority()
@@ -306,26 +318,36 @@ class ApiPlatformExtensionTest extends TestCase
 
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['enable_nelmio_api_doc' => true]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['doctrine_mongodb_odm']['enabled'] = false;
+        $config['api_platform']['enable_nelmio_api_doc'] = true;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
-    public function testDisableGraphql()
+    public function testDisableGraphQl()
     {
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
-        $containerBuilderProphecy->setDefinition('api_platform.action.graphql_entrypoint')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.factory.collection')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.factory.item_mutation')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.item')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.resource_field')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.executor')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.schema_builder')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.normalizer.item')->shouldNotBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.graphql.normalizer.item.non_resource')->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.action.entrypoint', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.factory.collection', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.factory.item_mutation', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.item', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.resolver.resource_field', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.executor', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.schema_builder', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.normalizer.item', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.normalizer.object', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.enabled', true)->shouldNotBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.enabled', false)->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.graphql.graphiql.enabled', true)->shouldNotBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.graphql.graphiql.enabled', false)->shouldNotBeCalled();
+
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['graphql' => ['enabled' => false]]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['graphql']['enabled'] = false;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testEnableSecurity()
@@ -350,7 +372,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->getParameter('api_platform.resource_class_directories')->shouldBeCalled()->willReturn([]);
         $i = 0;
         // it's called once from getResourcesToWatch and then if the configuration exists
-        $containerBuilderProphecy->setParameter('api_platform.resource_class_directories', Argument::that(function ($arg) use ($i) {
+        $containerBuilderProphecy->setParameter('api_platform.resource_class_directories', Argument::that(function ($arg) use (&$i) {
             if (0 === $i++) {
                 return $arg;
             }
@@ -363,16 +385,22 @@ class ApiPlatformExtensionTest extends TestCase
         }))->shouldBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['resource_class_directories' => ['foobar']]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['resource_class_directories'] = ['foobar'];
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testResourcesToWatchWithUnsupportedMappingType()
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageRegExp('/Unsupported mapping type in ".+", supported types are XML & Yaml\\./');
+        $this->expectExceptionMessageRegExp('/Unsupported mapping type in ".+", supported types are XML & YAML\\./');
+
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['mapping']['paths'] = [__FILE__];
 
         $this->extension->load(
-            array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['mapping' => ['paths' => [__FILE__]]]]),
+            $config,
             $this->getPartialContainerBuilderProphecy()->reveal()
         );
     }
@@ -382,8 +410,11 @@ class ApiPlatformExtensionTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Could not open file or directory "fake_file.xml".');
 
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['mapping']['paths'] = ['fake_file.xml'];
+
         $this->extension->load(
-            array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['mapping' => ['paths' => ['fake_file.xml']]]]),
+            $config,
             $this->getPartialContainerBuilderProphecy()->reveal()
         );
     }
@@ -397,7 +428,11 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->removeDefinition('api_platform.doctrine.orm.query_extension.eager_loading')->shouldBeCalled();
         $containerBuilderProphecy->removeDefinition('api_platform.doctrine.orm.query_extension.filter_eager_loading')->shouldBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['eager_loading' => ['enabled' => false]]]), $containerBuilder);
+
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['eager_loading']['enabled'] = false;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
     public function testNotRegisterHttpCacheWhenEnabledWithNoVarnishServer()
@@ -458,8 +493,12 @@ class ApiPlatformExtensionTest extends TestCase
     public function testDisabledMessenger()
     {
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
-        $containerBuilderProphecy->setAlias('api_platform.message_bus', 'message_bus')->shouldNotBeCalled();
+        $containerBuilderProphecy->setAlias('api_platform.message_bus', 'messenger.default_bus')->shouldNotBeCalled();
+        if (!class_exists(HandlerFailedException::class)) {
+            $containerBuilderProphecy->setAlias('api_platform.message_bus', 'message_bus')->shouldNotBeCalled();
+        }
         $containerBuilderProphecy->setDefinition('api_platform.messenger.data_persister', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.messenger.data_transformer', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
 
         $config = self::DEFAULT_CONFIG;
@@ -470,11 +509,26 @@ class ApiPlatformExtensionTest extends TestCase
 
     public function testDisableDoctrine()
     {
-        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
+        $this->runDisableDoctrineTests();
+    }
+
+    /**
+     * @group mongodb
+     */
+    public function testDisableDoctrineWithMongoDbOdm()
+    {
+        $this->runDisableDoctrineTests();
+    }
+
+    private function runDisableDoctrineTests()
+    {
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy([]);
         $containerBuilderProphecy->registerForAutoconfiguration(QueryItemExtensionInterface::class)->shouldNotBeCalled();
         $this->childDefinitionProphecy->addTag('api_platform.doctrine.orm.query_extension.item')->shouldNotBeCalled();
         $containerBuilderProphecy->registerForAutoconfiguration(QueryCollectionExtensionInterface::class)->shouldNotBeCalled();
         $this->childDefinitionProphecy->addTag('api_platform.doctrine.orm.query_extension.collection')->shouldNotBeCalled();
+        $containerBuilderProphecy->registerForAutoconfiguration(DoctrineOrmAbstractContextAwareFilter::class)->shouldNotBeCalled();
+        $this->childDefinitionProphecy->setBindings(['$requestStack' => null])->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine.listener.http_cache.purge', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine.orm.boolean_filter', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine.orm.collection_data_provider', Argument::type(Definition::class))->shouldNotBeCalled();
@@ -511,9 +565,15 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->setAlias(ExistsFilter::class, 'api_platform.doctrine.orm.exists_filter')->shouldNotBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['doctrine' => ['enabled' => false]]]), $containerBuilder);
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['doctrine']['enabled'] = false;
+
+        $this->extension->load($config, $containerBuilder);
     }
 
+    /**
+     * @group mongodb
+     */
     public function testDisableDoctrineMongoDbOdm()
     {
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
@@ -521,6 +581,8 @@ class ApiPlatformExtensionTest extends TestCase
         $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.item')->shouldNotBeCalled();
         $containerBuilderProphecy->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)->shouldNotBeCalled();
         $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection')->shouldNotBeCalled();
+        $containerBuilderProphecy->registerForAutoconfiguration(DoctrineMongoDbOdmAbstractFilter::class)->shouldNotBeCalled();
+        $this->childDefinitionProphecy->setBindings(Argument::allOf(Argument::withEntry('$managerRegistry', Argument::type(Reference::class))))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine_mongodb.odm.aggregation_extension.filter', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine_mongodb.odm.aggregation_extension.order', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine_mongodb.odm.aggregation_extension.pagination', Argument::type(Definition::class))->shouldNotBeCalled();
@@ -552,7 +614,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->setAlias(MongoDbOdmRangeFilter::class, 'api_platform.doctrine_mongodb.odm.range_filter')->shouldNotBeCalled();
         $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $this->extension->load(array_merge_recursive(self::DEFAULT_CONFIG, ['api_platform' => ['doctrine_mongodb_odm' => ['enabled' => false]]]), $containerBuilder);
+        $this->extension->load(self::DEFAULT_CONFIG, $containerBuilder);
     }
 
     public function testEnableElasticsearch()
@@ -602,36 +664,65 @@ class ApiPlatformExtensionTest extends TestCase
         $this->extension->load($config, $containerBuilderProphecy->reveal());
     }
 
-    private function getPartialContainerBuilderProphecy()
+    /**
+     * @group legacy
+     * @expectedDeprecation The "api_platform.metadata_cache" parameter is deprecated since version 2.4 and will have no effect in 3.0.
+     */
+    public function testDisableMetadataCache()
     {
-        $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
+        $containerBuilderProphecy->hasParameter('api_platform.metadata_cache')->willReturn(true);
+        $containerBuilderProphecy->getParameter('api_platform.metadata_cache')->willReturn(false);
+        $containerBuilderProphecy->removeDefinition('api_platform.cache_warmer.cache_pool_clearer')->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.cache.metadata.property', ArrayAdapter::class)->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.cache.metadata.resource', ArrayAdapter::class)->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.cache.route_name_resolver', ArrayAdapter::class)->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.cache.identifiers_extractor', ArrayAdapter::class)->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.cache.subresource_operation_factory', ArrayAdapter::class)->shouldBeCalled();
+        $containerBuilderProphecy->register('api_platform.elasticsearch.cache.metadata.document', ArrayAdapter::class)->shouldBeCalled();
 
+        $containerBuilder = $containerBuilderProphecy->reveal();
+
+        $this->extension->load(self::DEFAULT_CONFIG, $containerBuilder);
+    }
+
+    public function testRemoveCachePoolClearerCacheWarmerWithoutDebug()
+    {
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
         $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
         $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
+        $containerBuilderProphecy->removeDefinition('api_platform.cache_warmer.cache_pool_clearer')->shouldBeCalled();
 
-        $containerBuilderProphecy->registerForAutoconfiguration(DataPersisterInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.data_persister')->shouldBeCalledTimes(1);
+        $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $containerBuilderProphecy->registerForAutoconfiguration(ItemDataProviderInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.item_data_provider')->shouldBeCalledTimes(1);
+        $this->extension->load(self::DEFAULT_CONFIG, $containerBuilder);
+    }
 
-        $containerBuilderProphecy->registerForAutoconfiguration(CollectionDataProviderInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.collection_data_provider')->shouldBeCalledTimes(1);
+    public function testKeepCachePoolClearerCacheWarmerWithDebug()
+    {
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
+        $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
+        $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(true);
+        $containerBuilderProphecy->removeDefinition('api_platform.cache_warmer.cache_pool_clearer')->shouldNotBeCalled();
 
-        $containerBuilderProphecy->registerForAutoconfiguration(SubresourceDataProviderInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.subresource_data_provider')->shouldBeCalledTimes(1);
+        // irrelevant, but to prevent errors
+        $containerBuilderProphecy->setDefinition('debug.api_platform.collection_data_provider', Argument::type(Definition::class))->will(function () {});
+        $containerBuilderProphecy->setDefinition('debug.api_platform.item_data_provider', Argument::type(Definition::class))->will(function () {});
+        $containerBuilderProphecy->setDefinition('debug.api_platform.subresource_data_provider', Argument::type(Definition::class))->will(function () {});
+        $containerBuilderProphecy->setDefinition('debug.api_platform.data_persister', Argument::type(Definition::class))->will(function () {});
 
-        $containerBuilderProphecy->registerForAutoconfiguration(FilterInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.filter')->shouldBeCalledTimes(1);
+        $containerBuilder = $containerBuilderProphecy->reveal();
 
-        $containerBuilderProphecy->getParameter('kernel.bundles')->willReturn([
-            'DoctrineBundle' => DoctrineBundle::class,
-        ])->shouldBeCalled();
+        $this->extension->load(self::DEFAULT_CONFIG, $containerBuilder);
+    }
+
+    private function getPartialContainerBuilderProphecy()
+    {
+        $parameterBag = new EnvPlaceholderParameterBag();
+
+        $containerBuilderProphecy = $this->prophesize(ContainerBuilder::class);
+
+        $containerBuilderProphecy->getParameterBag()->willReturn($parameterBag);
 
         $containerBuilderProphecy->getParameter('kernel.bundles_metadata')->willReturn([
             'TestBundle' => [
@@ -707,31 +798,29 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->hasExtension('http://symfony.com/schema/dic/services')->shouldBeCalled();
 
         $definitions = [
-            'api_platform.data_persister',
             'api_platform.action.documentation',
-            'api_platform.action.placeholder',
             'api_platform.action.entrypoint',
             'api_platform.action.exception',
             'api_platform.action.placeholder',
-            'api_platform.cache.metadata.property',
             'api_platform.cache.identifiers_extractor',
+            'api_platform.cache.metadata.property',
             'api_platform.cache.metadata.resource',
             'api_platform.cache.route_name_resolver',
             'api_platform.cache.subresource_operation_factory',
+            'api_platform.cache_warmer.cache_pool_clearer',
             'api_platform.collection_data_provider',
-            'api_platform.formats_provider',
-            'api_platform.filter_locator',
+            'api_platform.data_persister',
             'api_platform.filter_collection_factory',
+            'api_platform.filter_locator',
             'api_platform.filters',
+            'api_platform.formats_provider',
             'api_platform.identifiers_extractor',
             'api_platform.identifiers_extractor.cached',
             'api_platform.iri_converter',
             'api_platform.identifier.converter',
-            'api_platform.identifier.integer',
             'api_platform.identifier.date_normalizer',
+            'api_platform.identifier.integer',
             'api_platform.identifier.uuid_normalizer',
-            'api_platform.identifiers_extractor',
-            'api_platform.identifiers_extractor.cached',
             'api_platform.item_data_provider',
             'api_platform.listener.exception',
             'api_platform.listener.exception.validation',
@@ -740,15 +829,12 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.listener.request.read',
             'api_platform.listener.view.respond',
             'api_platform.listener.view.serialize',
-            'api_platform.listener.view.validate',
-            'api_platform.listener.view.validate_query_parameters',
             'api_platform.listener.view.write',
             'api_platform.metadata.extractor.xml',
             'api_platform.metadata.property.metadata_factory.cached',
             'api_platform.metadata.property.metadata_factory.inherited',
             'api_platform.metadata.property.metadata_factory.property_info',
             'api_platform.metadata.property.metadata_factory.serializer',
-            'api_platform.metadata.property.metadata_factory.validator',
             'api_platform.metadata.property.metadata_factory.xml',
             'api_platform.metadata.property.name_collection_factory.cached',
             'api_platform.metadata.property.name_collection_factory.inherited',
@@ -778,15 +864,13 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.router',
             'api_platform.serializer.context_builder',
             'api_platform.serializer.context_builder.filter',
-            'api_platform.serializer.property_filter',
             'api_platform.serializer.group_filter',
             'api_platform.serializer.normalizer.item',
-            'api_platform.serializer.normalizer.item.non_resource',
+            'api_platform.serializer.property_filter',
+            'api_platform.serializer_locator',
             'api_platform.subresource_data_provider',
             'api_platform.subresource_operation_factory',
             'api_platform.subresource_operation_factory.cached',
-            'api_platform.serializer_locator',
-            'api_platform.validator',
         ];
 
         foreach ($definitions as $definition) {
@@ -822,7 +906,6 @@ class ApiPlatformExtensionTest extends TestCase
             ResourceMetadataFactoryInterface::class => 'api_platform.metadata.resource.metadata_factory',
             PropertyNameCollectionFactoryInterface::class => 'api_platform.metadata.property.name_collection_factory',
             PropertyMetadataFactoryInterface::class => 'api_platform.metadata.property.metadata_factory',
-            ValidatorInterface::class => 'api_platform.validator',
             ResourceClassResolverInterface::class => 'api_platform.resource_class_resolver',
             PropertyFilter::class => 'api_platform.serializer.property_filter',
             GroupFilter::class => 'api_platform.serializer.group_filter',
@@ -835,14 +918,46 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->getParameter('kernel.project_dir')->willReturn(__DIR__);
         $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
 
-        $containerBuilderProphecy->getDefinition('api_platform.http_cache.purger.varnish')->willReturn(new Definition());
+        // irrelevant, but to prevent errors
+        $definitionDummy = $this->prophesize(Definition::class);
+        $containerBuilderProphecy->getDefinition('api_platform.http_cache.purger.varnish')->willReturn($definitionDummy);
+        if (method_exists(ContainerBuilder::class, 'removeBindings')) {
+            $containerBuilderProphecy->removeBindings(Argument::type('string'))->will(function () {});
+        }
 
         return $containerBuilderProphecy;
     }
 
-    private function getBaseContainerBuilderProphecy()
+    private function getBaseContainerBuilderProphecy(array $doctrineIntegrationsToLoad = ['orm'])
     {
         $containerBuilderProphecy = $this->getPartialContainerBuilderProphecy();
+
+        $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
+        $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
+
+        $containerBuilderProphecy->getParameter('kernel.bundles')->willReturn([
+            'DoctrineBundle' => DoctrineBundle::class,
+        ]);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(DataPersisterInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->addTag('api_platform.data_persister')->shouldBeCalledTimes(1);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(ItemDataProviderInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->addTag('api_platform.item_data_provider')->shouldBeCalledTimes(1);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(CollectionDataProviderInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->addTag('api_platform.collection_data_provider')->shouldBeCalledTimes(1);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(SubresourceDataProviderInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->addTag('api_platform.subresource_data_provider')->shouldBeCalledTimes(1);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(FilterInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->addTag('api_platform.filter')->shouldBeCalledTimes(1);
 
         $containerBuilderProphecy->registerForAutoconfiguration(QueryItemExtensionInterface::class)
             ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
@@ -852,13 +967,23 @@ class ApiPlatformExtensionTest extends TestCase
             ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
         $this->childDefinitionProphecy->addTag('api_platform.doctrine.orm.query_extension.collection')->shouldBeCalledTimes(1);
 
-        $containerBuilderProphecy->registerForAutoconfiguration(AggregationItemExtensionInterface::class)
+        $containerBuilderProphecy->registerForAutoconfiguration(DoctrineOrmAbstractContextAwareFilter::class)
             ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.item')->shouldBeCalledTimes(1);
+        $this->childDefinitionProphecy->setBindings(['$requestStack' => null])->shouldBeCalledTimes(1);
 
-        $containerBuilderProphecy->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)
-            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection')->shouldBeCalledTimes(1);
+        if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
+            $containerBuilderProphecy->registerForAutoconfiguration(AggregationItemExtensionInterface::class)
+                ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+            $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.item')->shouldBeCalledTimes(1);
+
+            $containerBuilderProphecy->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)
+                ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+            $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection')->shouldBeCalledTimes(1);
+
+            $containerBuilderProphecy->registerForAutoconfiguration(DoctrineMongoDbOdmAbstractFilter::class)
+                ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+            $this->childDefinitionProphecy->setBindings(Argument::allOf(Argument::withEntry('$managerRegistry', Argument::type(Reference::class))))->shouldBeCalledTimes(1);
+        }
 
         $containerBuilderProphecy->registerForAutoconfiguration(DataTransformerInterface::class)
             ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
@@ -900,7 +1025,6 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.data_collector.request',
             'api_platform.doctrine.listener.http_cache.purge',
             'api_platform.doctrine.listener.mercure.publish',
-            'api_platform.doctrine.metadata_factory',
             'api_platform.doctrine.orm.boolean_filter',
             'api_platform.doctrine.orm.collection_data_provider',
             'api_platform.doctrine.orm.data_persister',
@@ -921,25 +1045,6 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.doctrine.orm.range_filter',
             'api_platform.doctrine.orm.search_filter',
             'api_platform.doctrine.orm.subresource_data_provider',
-            'api_platform.doctrine_mongodb.odm.aggregation_extension.filter',
-            'api_platform.doctrine_mongodb.odm.aggregation_extension.order',
-            'api_platform.doctrine_mongodb.odm.aggregation_extension.pagination',
-            'api_platform.doctrine_mongodb.odm.boolean_filter',
-            'api_platform.doctrine_mongodb.odm.collection_data_provider',
-            'api_platform.doctrine_mongodb.odm.data_persister',
-            'api_platform.doctrine_mongodb.odm.date_filter',
-            'api_platform.doctrine_mongodb.odm.default.collection_data_provider',
-            'api_platform.doctrine_mongodb.odm.default.item_data_provider',
-            'api_platform.doctrine_mongodb.odm.default.subresource_data_provider',
-            'api_platform.doctrine_mongodb.odm.default_document_manager.property_info_extractor',
-            'api_platform.doctrine_mongodb.odm.exists_filter',
-            'api_platform.doctrine_mongodb.odm.item_data_provider',
-            'api_platform.doctrine_mongodb.odm.metadata.property.metadata_factory',
-            'api_platform.doctrine_mongodb.odm.numeric_filter',
-            'api_platform.doctrine_mongodb.odm.order_filter',
-            'api_platform.doctrine_mongodb.odm.range_filter',
-            'api_platform.doctrine_mongodb.odm.search_filter',
-            'api_platform.doctrine_mongodb.odm.subresource_data_provider',
             'api_platform.graphql.action.entrypoint',
             'api_platform.graphql.executor',
             'api_platform.graphql.schema_builder',
@@ -948,12 +1053,12 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.graphql.resolver.item',
             'api_platform.graphql.resolver.resource_field',
             'api_platform.graphql.normalizer.item',
-            'api_platform.graphql.normalizer.item.non_resource',
+            'api_platform.graphql.normalizer.object',
             'api_platform.hal.encoder',
             'api_platform.hal.normalizer.collection',
             'api_platform.hal.normalizer.entrypoint',
             'api_platform.hal.normalizer.item',
-            'api_platform.hal.normalizer.item.non_resource',
+            'api_platform.hal.normalizer.object',
             'api_platform.http_cache.listener.response.add_tags',
             'api_platform.http_cache.listener.response.configure',
             'api_platform.http_cache.purger.varnish_client',
@@ -970,11 +1075,15 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.jsonld.context_builder',
             'api_platform.jsonld.encoder',
             'api_platform.jsonld.normalizer.item',
-            'api_platform.jsonld.normalizer.item.non_resource',
+            'api_platform.jsonld.normalizer.object',
+            'api_platform.listener.view.validate',
+            'api_platform.listener.view.validate_query_parameters',
             'api_platform.mercure.listener.response.add_link_header',
             'api_platform.messenger.data_persister',
+            'api_platform.messenger.data_transformer',
             'api_platform.metadata.extractor.yaml',
             'api_platform.metadata.property.metadata_factory.annotation',
+            'api_platform.metadata.property.metadata_factory.validator',
             'api_platform.metadata.property.metadata_factory.yaml',
             'api_platform.metadata.property.name_collection_factory.yaml',
             'api_platform.metadata.resource.filter_metadata_factory.annotation',
@@ -997,19 +1106,44 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.validator',
         ];
 
+        if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
+            $definitions = array_merge($definitions, [
+                'api_platform.doctrine_mongodb.odm.aggregation_extension.filter',
+                'api_platform.doctrine_mongodb.odm.aggregation_extension.order',
+                'api_platform.doctrine_mongodb.odm.aggregation_extension.pagination',
+                'api_platform.doctrine_mongodb.odm.boolean_filter',
+                'api_platform.doctrine_mongodb.odm.collection_data_provider',
+                'api_platform.doctrine_mongodb.odm.data_persister',
+                'api_platform.doctrine_mongodb.odm.date_filter',
+                'api_platform.doctrine_mongodb.odm.default.collection_data_provider',
+                'api_platform.doctrine_mongodb.odm.default.item_data_provider',
+                'api_platform.doctrine_mongodb.odm.default.subresource_data_provider',
+                'api_platform.doctrine_mongodb.odm.default_document_manager.property_info_extractor',
+                'api_platform.doctrine_mongodb.odm.exists_filter',
+                'api_platform.doctrine_mongodb.odm.item_data_provider',
+                'api_platform.doctrine_mongodb.odm.metadata.property.metadata_factory',
+                'api_platform.doctrine_mongodb.odm.numeric_filter',
+                'api_platform.doctrine_mongodb.odm.order_filter',
+                'api_platform.doctrine_mongodb.odm.range_filter',
+                'api_platform.doctrine_mongodb.odm.search_filter',
+                'api_platform.doctrine_mongodb.odm.subresource_data_provider',
+            ]);
+        }
+
+        if (0 !== \count($doctrineIntegrationsToLoad)) {
+            $definitions[] = 'api_platform.doctrine.metadata_factory';
+        }
+
         foreach ($definitions as $definition) {
             $containerBuilderProphecy->setDefinition($definition, Argument::type(Definition::class))->shouldBeCalled();
         }
 
         $aliases = [
             'api_platform.http_cache.purger' => 'api_platform.http_cache.purger.varnish',
-            'api_platform.message_bus' => 'message_bus',
+            'api_platform.message_bus' => 'messenger.default_bus',
             EagerLoadingExtension::class => 'api_platform.doctrine.orm.query_extension.eager_loading',
             FilterExtension::class => 'api_platform.doctrine.orm.query_extension.filter',
             FilterEagerLoadingExtension::class => 'api_platform.doctrine.orm.query_extension.filter_eager_loading',
-            MongoDbOdmFilterExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.filter',
-            MongoDbOdmOrderExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.order',
-            MongoDbOdmPaginationExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.pagination',
             PaginationExtension::class => 'api_platform.doctrine.orm.query_extension.pagination',
             OrderExtension::class => 'api_platform.doctrine.orm.query_extension.order',
             ValidatorInterface::class => 'api_platform.validator',
@@ -1020,23 +1154,38 @@ class ApiPlatformExtensionTest extends TestCase
             BooleanFilter::class => 'api_platform.doctrine.orm.boolean_filter',
             NumericFilter::class => 'api_platform.doctrine.orm.numeric_filter',
             ExistsFilter::class => 'api_platform.doctrine.orm.exists_filter',
-            MongoDbOdmSearchFilter::class => 'api_platform.doctrine_mongodb.odm.search_filter',
-            MongoDbOdmBooleanFilter::class => 'api_platform.doctrine_mongodb.odm.boolean_filter',
-            MongoDbOdmDateFilter::class => 'api_platform.doctrine_mongodb.odm.date_filter',
-            MongoDbOdmExistsFilter::class => 'api_platform.doctrine_mongodb.odm.exists_filter',
-            MongoDbOdmNumericFilter::class => 'api_platform.doctrine_mongodb.odm.numeric_filter',
-            MongoDbOdmOrderFilter::class => 'api_platform.doctrine_mongodb.odm.order_filter',
-            MongoDbOdmRangeFilter::class => 'api_platform.doctrine_mongodb.odm.range_filter',
         ];
+
+        if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
+            $aliases += [
+                MongoDbOdmSearchFilter::class => 'api_platform.doctrine_mongodb.odm.search_filter',
+                MongoDbOdmBooleanFilter::class => 'api_platform.doctrine_mongodb.odm.boolean_filter',
+                MongoDbOdmDateFilter::class => 'api_platform.doctrine_mongodb.odm.date_filter',
+                MongoDbOdmExistsFilter::class => 'api_platform.doctrine_mongodb.odm.exists_filter',
+                MongoDbOdmNumericFilter::class => 'api_platform.doctrine_mongodb.odm.numeric_filter',
+                MongoDbOdmOrderFilter::class => 'api_platform.doctrine_mongodb.odm.order_filter',
+                MongoDbOdmRangeFilter::class => 'api_platform.doctrine_mongodb.odm.range_filter',
+                MongoDbOdmFilterExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.filter',
+                MongoDbOdmOrderExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.order',
+                MongoDbOdmPaginationExtension::class => 'api_platform.doctrine_mongodb.odm.aggregation_extension.pagination',
+            ];
+        }
 
         foreach ($aliases as $alias => $service) {
             $containerBuilderProphecy->setAlias($alias, $service)->shouldBeCalled();
         }
 
-        $containerBuilderProphecy->hasParameter('api_platform.metadata_cache')->willReturn(true)->shouldBeCalled();
-        $containerBuilderProphecy->getParameter('api_platform.metadata_cache')->willReturn(true)->shouldBeCalled();
+        if (!class_exists(HandlerFailedException::class)) {
+            $containerBuilderProphecy->setAlias('api_platform.message_bus', 'message_bus')->shouldBeCalled();
+        }
 
-        $containerBuilderProphecy->getDefinition('api_platform.mercure.listener.response.add_link_header')->willReturn(new Definition());
+        $containerBuilderProphecy->hasParameter('api_platform.metadata_cache')->willReturn(false);
+
+        // irrelevant, but to prevent errors
+        $definitionDummy = $this->prophesize(Definition::class);
+        $containerBuilderProphecy->removeDefinition('api_platform.cache_warmer.cache_pool_clearer')->will(function () {});
+        $containerBuilderProphecy->getDefinition('api_platform.mercure.listener.response.add_link_header')->willReturn($definitionDummy);
+        $containerBuilderProphecy->getDefinition('api_platform.doctrine.listener.mercure.publish')->willReturn($definitionDummy);
 
         return $containerBuilderProphecy;
     }

@@ -37,12 +37,12 @@ trait AttributesHydratorTrait
     /**
      * @var array
      */
-    public $attributes = [];
+    public $attributes = null;
 
     /**
      * @throws InvalidArgumentException
      */
-    private function hydrateAttributes(array $values)
+    private function hydrateAttributes(array $values): void
     {
         if (isset($values['attributes'])) {
             $this->attributes = $values['attributes'];
@@ -55,7 +55,16 @@ trait AttributesHydratorTrait
                 throw new InvalidArgumentException(sprintf('Unknown property "%s" on annotation "%s".', $key, self::class));
             }
 
-            (new \ReflectionProperty($this, $key))->isPublic() ? $this->$key = $value : $this->attributes += [Inflector::tableize($key) => $value];
+            if ((new \ReflectionProperty($this, $key))->isPublic()) {
+                $this->{$key} = $value;
+                continue;
+            }
+
+            if (!\is_array($this->attributes)) {
+                $this->attributes = [];
+            }
+
+            $this->attributes += [Inflector::tableize($key) => $value];
         }
     }
 }

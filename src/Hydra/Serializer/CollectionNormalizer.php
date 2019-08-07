@@ -18,7 +18,6 @@ use ApiPlatform\Core\Api\OperationType;
 use ApiPlatform\Core\Api\ResourceClassResolverInterface;
 use ApiPlatform\Core\DataProvider\PaginatorInterface;
 use ApiPlatform\Core\DataProvider\PartialPaginatorInterface;
-use ApiPlatform\Core\Exception\InvalidArgumentException;
 use ApiPlatform\Core\JsonLd\ContextBuilderInterface;
 use ApiPlatform\Core\JsonLd\Serializer\JsonLdContextTrait;
 use ApiPlatform\Core\Serializer\ContextTrait;
@@ -39,7 +38,7 @@ final class CollectionNormalizer implements NormalizerInterface, NormalizerAware
     use JsonLdContextTrait;
     use NormalizerAwareTrait;
 
-    const FORMAT = 'jsonld';
+    public const FORMAT = 'jsonld';
 
     private $contextBuilder;
     private $resourceClassResolver;
@@ -62,24 +61,18 @@ final class CollectionNormalizer implements NormalizerInterface, NormalizerAware
 
     /**
      * {@inheritdoc}
+     *
+     * @param iterable $object
      */
     public function normalize($object, $format = null, array $context = [])
     {
-        if (isset($context['api_sub_level'])) {
+        if (!isset($context['resource_class']) || isset($context['api_sub_level'])) {
             return $this->normalizeRawCollection($object, $format, $context);
         }
 
-        try {
-            $resourceClass = $this->resourceClassResolver->getResourceClass($object, $context['resource_class'] ?? null, true);
-        } catch (InvalidArgumentException $e) {
-            if (!isset($context['resource_class'])) {
-                return $this->normalizeRawCollection($object, $format, $context);
-            }
-
-            throw $e;
-        }
-        $data = $this->addJsonLdContext($this->contextBuilder, $resourceClass, $context);
+        $resourceClass = $this->resourceClassResolver->getResourceClass($object, $context['resource_class']);
         $context = $this->initContext($resourceClass, $context);
+        $data = $this->addJsonLdContext($this->contextBuilder, $resourceClass, $context);
 
         if (isset($context['operation_type']) && OperationType::SUBRESOURCE === $context['operation_type']) {
             $data['@id'] = $this->iriConverter->getSubresourceIriFromResourceClass($resourceClass, $context);
@@ -117,7 +110,7 @@ final class CollectionNormalizer implements NormalizerInterface, NormalizerAware
     /**
      * Normalizes a raw collection (not API resources).
      */
-    private function normalizeRawCollection($object, $format = null, array $context = []): array
+    private function normalizeRawCollection(iterable $object, ?string $format, array $context): array
     {
         $data = [];
         foreach ($object as $index => $obj) {

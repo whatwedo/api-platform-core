@@ -19,7 +19,7 @@ use ApiPlatform\Core\Api\UrlGeneratorInterface;
 use ApiPlatform\Core\Exception\InvalidArgumentException;
 use ApiPlatform\Core\Exception\RuntimeException;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
-use ApiPlatform\Core\Util\ClassInfoTrait;
+use ApiPlatform\Core\Util\ResourceClassInfoTrait;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Component\Mercure\Update;
@@ -35,9 +35,8 @@ use Symfony\Component\Serializer\SerializerInterface;
  */
 final class PublishMercureUpdatesListener
 {
-    use ClassInfoTrait;
+    use ResourceClassInfoTrait;
 
-    private $resourceClassResolver;
     private $iriConverter;
     private $resourceMetadataFactory;
     private $serializer;
@@ -47,8 +46,12 @@ final class PublishMercureUpdatesListener
     private $createdEntities;
     private $updatedEntities;
     private $deletedEntities;
+    private $formats;
 
-    public function __construct(ResourceClassResolverInterface $resourceClassResolver, IriConverterInterface $iriConverter, ResourceMetadataFactoryInterface $resourceMetadataFactory, SerializerInterface $serializer, MessageBusInterface $messageBus = null, callable $publisher = null, ExpressionLanguage $expressionLanguage = null)
+    /**
+     * @param array<string, string[]|string> $formats
+     */
+    public function __construct(ResourceClassResolverInterface $resourceClassResolver, IriConverterInterface $iriConverter, ResourceMetadataFactoryInterface $resourceMetadataFactory, SerializerInterface $serializer, array $formats, MessageBusInterface $messageBus = null, callable $publisher = null, ExpressionLanguage $expressionLanguage = null)
     {
         if (null === $messageBus && null === $publisher) {
             throw new InvalidArgumentException('A message bus or a publisher must be provided.');
@@ -58,6 +61,7 @@ final class PublishMercureUpdatesListener
         $this->iriConverter = $iriConverter;
         $this->resourceMetadataFactory = $resourceMetadataFactory;
         $this->serializer = $serializer;
+        $this->formats = $formats;
         $this->messageBus = $messageBus;
         $this->publisher = $publisher;
         $this->expressionLanguage = $expressionLanguage ?? class_exists(ExpressionLanguage::class) ? new ExpressionLanguage() : null;
@@ -67,7 +71,7 @@ final class PublishMercureUpdatesListener
     /**
      * Collects created, updated and deleted entities.
      */
-    public function onFlush(OnFlushEventArgs $eventArgs)
+    public function onFlush(OnFlushEventArgs $eventArgs): void
     {
         $uow = $eventArgs->getEntityManager()->getUnitOfWork();
 
@@ -87,7 +91,7 @@ final class PublishMercureUpdatesListener
     /**
      * Publishes updates for changes collected on flush, and resets the store.
      */
-    public function postFlush()
+    public function postFlush(): void
     {
         try {
             foreach ($this->createdEntities as $entity) {
@@ -118,8 +122,7 @@ final class PublishMercureUpdatesListener
      */
     private function storeEntityToPublish($entity, string $property): void
     {
-        $resourceClass = $this->getObjectClass($entity);
-        if (!$this->resourceClassResolver->isResourceClass($resourceClass)) {
+        if (null === $resourceClass = $this->getResourceClass($entity)) {
             return;
         }
 
@@ -153,11 +156,11 @@ final class PublishMercureUpdatesListener
             return;
         }
 
-        $this->$property[$entity] = $value;
+        $this->{$property}[$entity] = $value;
     }
 
     /**
-     * @param object|string $entity
+     * @param object $entity
      */
     private function publishUpdate($entity, array $targets): void
     {
@@ -166,10 +169,14 @@ final class PublishMercureUpdatesListener
             // This may change in the feature, because it's not JSON Merge Patch compliant,
             // and I'm not a fond of this approach
             $iri = $entity->iri;
+            /** @var string $data */
             $data = json_encode(['@id' => $entity->id]);
         } else {
+            $resourceClass = $this->getObjectClass($entity);
+            $context = $this->resourceMetadataFactory->create($resourceClass)->getAttribute('normalization_context', []);
+
             $iri = $this->iriConverter->getIriFromItem($entity, UrlGeneratorInterface::ABS_URL);
-            $data = $this->serializer->serialize($entity, 'jsonld');
+            $data = $this->serializer->serialize($entity, key($this->formats), $context);
         }
 
         $update = new Update($iri, $data, $targets);

@@ -23,6 +23,8 @@ use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
 use PHPUnit\Framework\TestCase;
 
 /**
+ * @group mongodb
+ *
  * @author Alan Poulain <contact@alanpoulain.eu>
  */
 class DoctrineMongoDbOdmPropertyMetadataFactoryTest extends TestCase
@@ -38,7 +40,7 @@ class DoctrineMongoDbOdmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineMongoDbOdmPropertyMetadataFactory = new DoctrineMongoDbOdmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $this->assertEquals($doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id', []), $propertyMetadata);
+        $this->assertEquals($doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id'), $propertyMetadata);
     }
 
     public function testCreateIsIdentifier()
@@ -59,7 +61,7 @@ class DoctrineMongoDbOdmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineMongoDbOdmPropertyMetadataFactory = new DoctrineMongoDbOdmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $this->assertEquals($doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id', []), $propertyMetadata);
+        $this->assertEquals($doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id'), $propertyMetadata);
     }
 
     public function testCreateIsWritable()
@@ -81,7 +83,7 @@ class DoctrineMongoDbOdmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineMongoDbOdmPropertyMetadataFactory = new DoctrineMongoDbOdmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $doctrinePropertyMetadata = $doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id', []);
+        $doctrinePropertyMetadata = $doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id');
 
         $this->assertEquals($doctrinePropertyMetadata->isIdentifier(), true);
         $this->assertEquals($doctrinePropertyMetadata->isWritable(), false);
@@ -105,7 +107,7 @@ class DoctrineMongoDbOdmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineMongoDbOdmPropertyMetadataFactory = new DoctrineMongoDbOdmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $doctrinePropertyMetadata = $doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id', []);
+        $doctrinePropertyMetadata = $doctrineMongoDbOdmPropertyMetadataFactory->create(Dummy::class, 'id');
 
         $this->assertEquals($doctrinePropertyMetadata->isIdentifier(), true);
         $this->assertEquals($doctrinePropertyMetadata->isWritable(), false);

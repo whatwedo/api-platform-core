@@ -15,8 +15,10 @@ namespace ApiPlatform\Core\Validator\EventListener;
 
 use ApiPlatform\Core\Bridge\Symfony\Validator\Exception\ValidationException;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
+use ApiPlatform\Core\Metadata\Resource\ToggleableOperationAttributeTrait;
 use ApiPlatform\Core\Util\RequestAttributesExtractor;
 use ApiPlatform\Core\Validator\ValidatorInterface;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent;
 
 /**
@@ -26,6 +28,10 @@ use Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent;
  */
 final class ValidateListener
 {
+    use ToggleableOperationAttributeTrait;
+
+    public const OPERATION_ATTRIBUTE_KEY = 'validate';
+
     private $validator;
     private $resourceMetadataFactory;
 
@@ -40,22 +46,25 @@ final class ValidateListener
      *
      * @throws ValidationException
      */
-    public function onKernelView(GetResponseForControllerResultEvent $event)
+    public function onKernelView(GetResponseForControllerResultEvent $event): void
     {
+        $controllerResult = $event->getControllerResult();
         $request = $event->getRequest();
+
         if (
-            $request->isMethodSafe(false)
+            $controllerResult instanceof Response
+            || $request->isMethodSafe(false)
             || $request->isMethod('DELETE')
             || !($attributes = RequestAttributesExtractor::extractAttributes($request))
             || !$attributes['receive']
+            || $this->isOperationAttributeDisabled($attributes, self::OPERATION_ATTRIBUTE_KEY)
         ) {
             return;
         }
 
-        $data = $event->getControllerResult();
         $resourceMetadata = $this->resourceMetadataFactory->create($attributes['resource_class']);
-        $validationGroups = $resourceMetadata->getOperationAttribute($attributes, 'validation_groups', null, true);
 
-        $this->validator->validate($data, ['groups' => $validationGroups]);
+        $validationGroups = $resourceMetadata->getOperationAttribute($attributes, 'validation_groups', null, true);
+        $this->validator->validate($controllerResult, ['groups' => $validationGroups]);
     }
 }

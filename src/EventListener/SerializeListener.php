@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\EventListener;
 
 use ApiPlatform\Core\Exception\RuntimeException;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
+use ApiPlatform\Core\Metadata\Resource\ToggleableOperationAttributeTrait;
 use ApiPlatform\Core\Serializer\ResourceList;
 use ApiPlatform\Core\Serializer\SerializerContextBuilderInterface;
 use ApiPlatform\Core\Util\RequestAttributesExtractor;
@@ -32,24 +34,33 @@ use Symfony\Component\Serializer\SerializerInterface;
  */
 final class SerializeListener
 {
+    use ToggleableOperationAttributeTrait;
+
+    public const OPERATION_ATTRIBUTE_KEY = 'serialize';
+
     private $serializer;
     private $serializerContextBuilder;
 
-    public function __construct(SerializerInterface $serializer, SerializerContextBuilderInterface $serializerContextBuilder)
+    public function __construct(SerializerInterface $serializer, SerializerContextBuilderInterface $serializerContextBuilder, ResourceMetadataFactoryInterface $resourceMetadataFactory = null)
     {
         $this->serializer = $serializer;
         $this->serializerContextBuilder = $serializerContextBuilder;
+        $this->resourceMetadataFactory = $resourceMetadataFactory;
     }
 
     /**
      * Serializes the data to the requested format.
      */
-    public function onKernelView(GetResponseForControllerResultEvent $event)
+    public function onKernelView(GetResponseForControllerResultEvent $event): void
     {
         $controllerResult = $event->getControllerResult();
         $request = $event->getRequest();
 
-        if ($controllerResult instanceof Response || !(($attributes = RequestAttributesExtractor::extractAttributes($request))['respond'] ?? $request->attributes->getBoolean('_api_respond', false))) {
+        if (
+            $controllerResult instanceof Response
+            || !(($attributes = RequestAttributesExtractor::extractAttributes($request))['respond'] ?? $request->attributes->getBoolean('_api_respond', false))
+            || $attributes && $this->isOperationAttributeDisabled($attributes, self::OPERATION_ATTRIBUTE_KEY)
+        ) {
             return;
         }
 
@@ -62,7 +73,7 @@ final class SerializeListener
         $context = $this->serializerContextBuilder->createFromRequest($request, true, $attributes);
 
         if (isset($context['output']) && \array_key_exists('class', $context['output']) && null === $context['output']['class']) {
-            $event->setControllerResult('');
+            $event->setControllerResult(null);
 
             return;
         }
@@ -99,7 +110,7 @@ final class SerializeListener
      *
      * @throws RuntimeException
      */
-    private function serializeRawData(GetResponseForControllerResultEvent $event, Request $request, $controllerResult)
+    private function serializeRawData(GetResponseForControllerResultEvent $event, Request $request, $controllerResult): void
     {
         if (\is_object($controllerResult)) {
             $event->setControllerResult($this->serializer->serialize($controllerResult, $request->getRequestFormat(), $request->attributes->get('_api_normalization_context', [])));
@@ -108,7 +119,7 @@ final class SerializeListener
         }
 
         if (!$this->serializer instanceof EncoderInterface) {
-            throw new RuntimeException(sprintf('The serializer instance must implements the "%s" interface.', EncoderInterface::class));
+            throw new RuntimeException(sprintf('The serializer must implement the "%s" interface.', EncoderInterface::class));
         }
 
         $event->setControllerResult($this->serializer->encode($controllerResult, $request->getRequestFormat()));

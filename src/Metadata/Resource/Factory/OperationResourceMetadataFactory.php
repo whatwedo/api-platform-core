@@ -25,7 +25,7 @@ final class OperationResourceMetadataFactory implements ResourceMetadataFactoryI
     /**
      * @internal
      */
-    const SUPPORTED_COLLECTION_OPERATION_METHODS = [
+    public const SUPPORTED_COLLECTION_OPERATION_METHODS = [
         'GET' => true,
         'POST' => true,
     ];
@@ -33,7 +33,7 @@ final class OperationResourceMetadataFactory implements ResourceMetadataFactoryI
     /**
      * @internal
      */
-    const SUPPORTED_ITEM_OPERATION_METHODS = [
+    public const SUPPORTED_ITEM_OPERATION_METHODS = [
         'GET' => true,
         'PUT' => true,
         'DELETE' => true,
@@ -123,13 +123,17 @@ final class OperationResourceMetadataFactory implements ResourceMetadataFactoryI
                 $supported ? $operation['method'] = $upperOperationName : $operation['route_name'] = $operationName;
             }
 
+            if (isset($operation['method'])) {
+                $operation['method'] = strtoupper($operation['method']);
+            }
+
             $newOperations[$operationName] = $operation;
         }
 
         return $collection ? $resourceMetadata->withCollectionOperations($newOperations) : $resourceMetadata->withItemOperations($newOperations);
     }
 
-    private function normalizeGraphQl(ResourceMetadata $resourceMetadata, array $operations)
+    private function normalizeGraphQl(ResourceMetadata $resourceMetadata, array $operations): ResourceMetadata
     {
         foreach ($operations as $operationName => $operation) {
             if (\is_int($operationName) && \is_string($operation)) {

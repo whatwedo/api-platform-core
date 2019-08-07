@@ -54,7 +54,7 @@ class IdentifierManagerTraitTest extends TestCase
      */
     public function testSingleIdentifier()
     {
-        list($propertyNameCollectionFactory, $propertyMetadataFactory) = $this->getMetadataFactories(Dummy::class, [
+        [$propertyNameCollectionFactory, $propertyMetadataFactory] = $this->getMetadataFactories(Dummy::class, [
             'id',
         ]);
         $objectManager = $this->getEntityManager(Dummy::class, [
@@ -70,6 +70,7 @@ class IdentifierManagerTraitTest extends TestCase
 
     /**
      * @group legacy
+     * @group mongodb
      */
     public function testSingleDocumentIdentifier()
     {
@@ -92,7 +93,7 @@ class IdentifierManagerTraitTest extends TestCase
      */
     public function testCompositeIdentifier()
     {
-        list($propertyNameCollectionFactory, $propertyMetadataFactory) = $this->getMetadataFactories(Dummy::class, [
+        [$propertyNameCollectionFactory, $propertyMetadataFactory] = $this->getMetadataFactories(Dummy::class, [
             'ida',
             'idb',
         ]);
@@ -118,7 +119,7 @@ class IdentifierManagerTraitTest extends TestCase
         $this->expectException(PropertyNotFoundException::class);
         $this->expectExceptionMessage('Invalid identifier "idbad=1;idb=2", "ida" was not found.');
 
-        list($propertyNameCollectionFactory, $propertyMetadataFactory) = $this->getMetadataFactories(Dummy::class, [
+        [$propertyNameCollectionFactory, $propertyMetadataFactory] = $this->getMetadataFactories(Dummy::class, [
             'ida',
             'idb',
         ]);

@@ -58,7 +58,7 @@ final class AnnotationPropertyMetadataFactory implements PropertyMetadataFactory
         if ($reflectionClass->hasProperty($property)) {
             $annotation = $this->reader->getPropertyAnnotation($reflectionClass->getProperty($property), ApiProperty::class);
 
-            if (null !== $annotation) {
+            if ($annotation instanceof ApiProperty) {
                 return $this->createMetadata($annotation, $parentPropertyMetadata);
             }
         }
@@ -75,7 +75,8 @@ final class AnnotationPropertyMetadataFactory implements PropertyMetadataFactory
             }
 
             $annotation = $this->reader->getMethodAnnotation($reflectionMethod, ApiProperty::class);
-            if (null !== $annotation) {
+
+            if ($annotation instanceof ApiProperty) {
                 return $this->createMetadata($annotation, $parentPropertyMetadata);
             }
         }
@@ -88,7 +89,7 @@ final class AnnotationPropertyMetadataFactory implements PropertyMetadataFactory
      *
      * @throws PropertyNotFoundException
      */
-    private function handleNotFound(PropertyMetadata $parentPropertyMetadata = null, string $resourceClass, string $property): PropertyMetadata
+    private function handleNotFound(?PropertyMetadata $parentPropertyMetadata, string $resourceClass, string $property): PropertyMetadata
     {
         if (null !== $parentPropertyMetadata) {
             return $parentPropertyMetadata;
@@ -129,6 +130,6 @@ final class AnnotationPropertyMetadataFactory implements PropertyMetadataFactory
     {
         $wither = 'with'.ucfirst($property[1]);
 
-        return $propertyMetadata->$wither($value);
+        return $propertyMetadata->{$wither}($value);
     }
 }

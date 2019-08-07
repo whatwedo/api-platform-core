@@ -21,6 +21,8 @@ use Doctrine\ODM\MongoDB\Repository\DocumentRepository;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
+ * @internal
+ *
  * @author Alan Poulain <contact@alanpoulain.eu>
  */
 abstract class DoctrineMongoDbOdmFilterTestCase extends KernelTestCase
@@ -45,7 +47,7 @@ abstract class DoctrineMongoDbOdmFilterTestCase extends KernelTestCase
      */
     protected $filterClass;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         self::bootKernel();
 
@@ -57,12 +59,12 @@ abstract class DoctrineMongoDbOdmFilterTestCase extends KernelTestCase
     /**
      * @dataProvider provideApplyTestData
      */
-    public function testApply(array $properties = null, array $filterParameters, array $expectedPipeline, callable $factory = null)
+    public function testApply(?array $properties, array $filterParameters, array $expectedPipeline, callable $factory = null)
     {
         $this->doTestApply($properties, $filterParameters, $expectedPipeline, $factory);
     }
 
-    protected function doTestApply(array $properties = null, array $filterParameters, array $expectedPipeline, callable $filterFactory = null)
+    protected function doTestApply(?array $properties, array $filterParameters, array $expectedPipeline, callable $filterFactory = null)
     {
         if (null === $filterFactory) {
             $filterFactory = function (ManagerRegistry $managerRegistry, array $properties = null): FilterInterface {

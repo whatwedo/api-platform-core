@@ -46,6 +46,9 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
 
     private $iriConverter;
     private $dataPersister;
+    /**
+     * @var NormalizerInterface&DenormalizerInterface
+     */
     private $normalizer;
     private $resourceMetadataFactory;
     private $resourceAccessChecker;
@@ -54,7 +57,7 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
     public function __construct(IriConverterInterface $iriConverter, DataPersisterInterface $dataPersister, NormalizerInterface $normalizer, ResourceMetadataFactoryInterface $resourceMetadataFactory, ResourceAccessCheckerInterface $resourceAccessChecker = null, ValidatorInterface $validator = null)
     {
         if (!$normalizer instanceof DenormalizerInterface) {
-            throw new InvalidArgumentException(sprintf('The normalizer must implements the "%s" interface', DenormalizerInterface::class));
+            throw new InvalidArgumentException(sprintf('The normalizer must implement the "%s" interface', DenormalizerInterface::class));
         }
 
         $this->iriConverter = $iriConverter;
@@ -76,12 +79,15 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
             $item = null;
 
             $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
-            $normalizationContext = $resourceMetadata->getGraphqlAttribute($operationName ?? '', 'normalization_context', [], true);
-            $normalizationContext['attributes'] = $this->fieldsToAttributes($info);
+            $wrapFieldName = lcfirst($resourceMetadata->getShortName());
+            $baseNormalizationContext = $resourceMetadata->getGraphqlAttribute($operationName ?? '', 'normalization_context', [], true);
+            $baseNormalizationContext['attributes'] = $this->fieldsToAttributes($info)[$wrapFieldName] ?? [];
+            $normalizationContext = $baseNormalizationContext;
+            $normalizationContext['resource_class'] = $resourceClass;
 
             if (isset($args['input']['id'])) {
                 try {
-                    $item = $this->iriConverter->getItemFromIri($args['input']['id'], $normalizationContext);
+                    $item = $this->iriConverter->getItemFromIri($args['input']['id'], $baseNormalizationContext);
                 } catch (ItemNotFoundException $e) {
                     throw Error::createLocatedError(sprintf('Item "%s" not found.', $args['input']['id']), $info->fieldNodes, $info->path);
                 }
@@ -90,36 +96,56 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
                     throw Error::createLocatedError(sprintf('Item "%s" did not match expected type "%s".', $args['input']['id'], $resourceMetadata->getShortName()), $info->fieldNodes, $info->path);
                 }
             }
+            $previousItem = \is_object($item) ? clone $item : $item;
 
-            $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
-            $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, $item, $operationName);
+            $inputMetadata = $resourceMetadata->getGraphqlAttribute($operationName, 'input', null, true);
+            $inputClass = null;
+            if (\is_array($inputMetadata) && \array_key_exists('class', $inputMetadata)) {
+                if (null === $inputMetadata['class']) {
+                    $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, [
+                        'object' => $item,
+                        'previous_object' => $previousItem,
+                    ], $operationName);
 
-            $inputMetadata = $resourceMetadata->getAttribute('input', ['class' => $resourceClass]);
-            if (null === $resourceClass = $inputMetadata['class'] ?? null) {
-                return true;
+                    return $data;
+                }
+
+                $inputClass = $inputMetadata['class'];
             }
 
-            switch ($operationName) {
-                case 'create':
-                case 'update':
-                    $context = null === $item ? ['resource_class' => $resourceClass] : ['resource_class' => $resourceClass, 'object_to_populate' => $item];
-                    $context += $resourceMetadata->getGraphqlAttribute($operationName, 'denormalization_context', [], true);
-                    $item = $this->normalizer->denormalize($args['input'], $resourceClass, ItemNormalizer::FORMAT, $context);
-                    $this->validate($item, $info, $resourceMetadata, $operationName);
-                    $persistResult = $this->dataPersister->persist($item);
+            if ('create' === $operationName || 'update' === $operationName) {
+                $context = ['resource_class' => $resourceClass, 'graphql_operation_name' => $operationName];
+                if (null !== $item) {
+                    $context['object_to_populate'] = $item;
+                }
 
-                    if (null === $persistResult) {
-                        @trigger_error(sprintf('Returning void from %s::persist() is deprecated since API Platform 2.3 and will not be supported in API Platform 3, an object should always be returned.', DataPersisterInterface::class), E_USER_DEPRECATED);
-                    }
+                $context += $resourceMetadata->getGraphqlAttribute($operationName, 'denormalization_context', [], true);
+                $item = $this->normalizer->denormalize($args['input'], $inputClass ?: $resourceClass, ItemNormalizer::FORMAT, $context);
+                $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, [
+                    'object' => $item,
+                    'previous_object' => $previousItem,
+                ], $operationName);
+                $this->validate($item, $info, $resourceMetadata, $operationName);
 
-                    return $this->normalizer->normalize($persistResult ?? $item, ItemNormalizer::FORMAT, $normalizationContext) + $data;
-                case 'delete':
-                    if ($item) {
-                        $this->dataPersister->remove($item);
-                        $data['id'] = $args['input']['id'];
-                    } else {
-                        $data['id'] = null;
-                    }
+                $persistResult = $this->dataPersister->persist($item, $context);
+                if (!\is_object($persistResult)) {
+                    @trigger_error(sprintf('Not returning an object from %s::persist() is deprecated since API Platform 2.3 and will not be supported in API Platform 3.', DataPersisterInterface::class), E_USER_DEPRECATED);
+                }
+
+                return [$wrapFieldName => $this->normalizer->normalize($persistResult ?? $item, ItemNormalizer::FORMAT, $normalizationContext)] + $data;
+            }
+
+            $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, [
+                'object' => $item,
+                'previous_object' => $previousItem,
+            ], $operationName);
+
+            if ('delete' === $operationName) {
+                $data[$wrapFieldName]['id'] = null;
+                if ($item) {
+                    $this->dataPersister->remove($item);
+                    $data[$wrapFieldName]['id'] = $args['input']['id'];
+                }
             }
 
             return $data;
@@ -131,7 +157,7 @@ final class ItemMutationResolverFactory implements ResolverFactoryInterface
      *
      * @throws Error
      */
-    private function validate($item, ResolveInfo $info, ResourceMetadata $resourceMetadata, string $operationName = null)
+    private function validate($item, ResolveInfo $info, ResourceMetadata $resourceMetadata, string $operationName = null): void
     {
         if (null === $this->validator) {
             return;

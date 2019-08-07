@@ -1,5 +1,114 @@
 # Changelog
 
+## 2.4.5
+
+* Fix denormalization of a constructor argument which is a collection of non-resources
+* Allow custom operations to return a different class than the expected resource class
+
+## 2.4.4
+
+* Store the original data in the `previous_data` request attribute, and allow to access it in security expressions using the `previous_object` variable (useful for PUT and PATCH requests)
+* Fix resource inheritance handling
+* Fix BC break in `AbstractItemNormalizer` introduced in 2.4
+* Fix serialization when using interface as resource
+* Basic compatibility with Symfony 4.3
+
+## 2.4.3
+
+* Doctrine: allow autowiring of filter classes
+* Doctrine: don't use `fetchJoinCollection` on `Paginator` when not needed
+* Doctrine: fix a BC break in `OrderFilter`
+* GraphQL: input objects aren't nullable anymore (compliance with the Relay spec)
+* Cache: Remove some useless purges
+* Mercure: publish to Mercure using the default response format
+* Mercure: use the Serializer context
+* OpenAPI: fix documentation of the `PropertyFilter`
+* OpenAPI: fix generation of the `servers` block (also fixes the compatibility with Postman)
+* OpenAPI: skip not readable and not writable properties from the spec
+* OpenAPI: add the `id` path parameter for POST item operation
+* Serializer: add support for Symfony Serializer's `@SerializedName` metadata
+* Metadata: `ApiResource`'s `attributes` property now defaults to `null`, as expected
+* Metadata: Fix identifier support when using an interface as resource class
+* Metadata: the HTTP method is now always uppercased
+* Allow to disable listeners per operation (fix handling of empty request content)
+
+    Previously, empty request content was allowed for any `POST` and `PUT` operations. This was an unsafe assumption which caused [other problems](https://github.com/api-platform/core/issues/2731).
+
+    If you wish to allow empty request content, please add `"deserialize"=false` to the operation's attributes. For example:
+
+    ```php
+    <?php
+    // api/src/Entity/Book.php
+
+    use ApiPlatform\Core\Annotation\ApiResource;
+    use App\Controller\PublishBookAction;
+
+    /**
+     * @ApiResource(
+     *     itemOperations={
+     *         "put_publish"={
+     *             "method"="PUT",
+     *             "path"="/books/{id}/publish",
+     *             "controller"=PublishBookAction::class,
+     *             "deserialize"=false,
+     *         },
+     *     },
+     * )
+     */
+    class Book
+    {
+    ```
+
+    You may also need to add `"validate"=false` if the controller result is `null` (possibly because you don't need to persist the resource).
+
+* Return the `204` HTTP status code when the output class is set to `null`
+* Be more resilient when normalizing non-resource objects
+* Replace the `data` request attribute by the return of the data persister
+* Fix error message in identifiers extractor
+* Improve the bundle's default configuration when using `symfony/symfony` is required
+* Fix the use of `MetadataAwareNameConverter` when available (configuring `name_converter: serializer.name_converter.metadata_aware` will now result in a circular reference error)
+
+## 2.4.2
+
+* Fix a dependency injection injection problem in `FilterEagerLoadingExtension`
+* Improve performance by adding a `NoOpScalarNormalizer` handling scalar values
+
+## 2.4.1
+
+* Improve performance of the dev environment and deprecate the `api_platform.metadata_cache` parameter
+* Fix a BC break in `SearchFilter`
+* Don't send HTTP cache headers for unsuccessful responses
+* GraphQL: parse input and messenger metadata on the GraphQl operation
+* GraphQL: do not enable graphql when `webonyx/graphql-php` is not installed
+
+## 2.4.0
+
+* Listeners are now opt-in when not handling API Platform operations
+* `DISTINCT` is not used when there are no joins
+* Preserve manual join in FilterEagerLoadingExtension
+* The `elasticsearch` attribute can be disabled resource-wise or per-operation
+* The `messenger` attribute can now take the `input` string as a value (`messenger="input"`). This will use a default transformer so that the given `input` is directly sent to the messenger handler.
+* The `messenger` attribute can be declared per-operation
+* Mercure updates are now published after the Doctrine flush event instead of on `kernel.terminate`, so the Mercure and the Messenger integration can be used together
+* Use Symfony's MetadataAwareNameConverter when available
+* Change the extension's priorities (`<0`) for improved compatibility with Symfony's autoconfiguration feature. If you have custom extensions we recommend to use positive priorities.
+
+| Service name                                               | Priority | Class                                              |
+|------------------------------------------------------------|------|---------------------------------------------------------|
+| api_platform.doctrine.orm.query_extension.eager_loading (collection) | -8 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\EagerLoadingExtension |
+| api_platform.doctrine.orm.query_extension.eager_loading (item) | -8 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\EagerLoadingExtension |
+| api_platform.doctrine.orm.query_extension.filter | -16 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\FilterExtension |
+| api_platform.doctrine.orm.query_extension.filter_eager_loading | -17 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\FilterEagerLoadingExtension |
+| api_platform.doctrine.orm.query_extension.order | -32 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\OrderExtension |
+| api_platform.doctrine.orm.query_extension.pagination | -64 | ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension |
+
+* Fix JSON-LD contexts when using output classes
+* GraphQl: Fix pagination (the `endCursor` behavior was wrong)
+* GraphQl: Improve output/input behavior
+* GraphQl: Improve mutations (make the `clientMutationId` nullable and return mutation payload as an object)
+* MongoDB: Fix search filter when searching by related collection id
+* MongoDB: Fix numeric and range filters
+
 ## 2.4.0 beta 2
 
 * Fix version constraints for Doctrine MongoDB ODM

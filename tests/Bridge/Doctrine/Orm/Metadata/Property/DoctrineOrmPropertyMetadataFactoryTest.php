@@ -39,24 +39,7 @@ class DoctrineOrmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $this->assertEquals($doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []), $propertyMetadata);
-    }
-
-    public function testCreateNoClassMetadata()
-    {
-        $propertyMetadata = new PropertyMetadata();
-        $propertyMetadataFactory = $this->prophesize(PropertyMetadataFactoryInterface::class);
-        $propertyMetadataFactory->create(Dummy::class, 'id', [])->shouldBeCalled()->willReturn($propertyMetadata);
-
-        $objectManager = $this->prophesize(ObjectManager::class);
-        $objectManager->getClassMetadata(Dummy::class)->shouldBeCalled()->willReturn(null);
-
-        $managerRegistry = $this->prophesize(ManagerRegistry::class);
-        $managerRegistry->getManagerForClass(Dummy::class)->shouldBeCalled()->willReturn($objectManager->reveal());
-
-        $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
-
-        $this->assertEquals($doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []), $propertyMetadata);
+        $this->assertEquals($doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id'), $propertyMetadata);
     }
 
     public function testCreateIsIdentifier()
@@ -77,7 +60,7 @@ class DoctrineOrmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $this->assertEquals($doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []), $propertyMetadata);
+        $this->assertEquals($doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id'), $propertyMetadata);
     }
 
     public function testCreateIsWritable()
@@ -99,7 +82,7 @@ class DoctrineOrmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []);
+        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id');
 
         $this->assertEquals($doctrinePropertyMetadata->isIdentifier(), true);
         $this->assertEquals($doctrinePropertyMetadata->isWritable(), false);
@@ -124,7 +107,7 @@ class DoctrineOrmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []);
+        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id');
 
         $this->assertEquals($doctrinePropertyMetadata->isIdentifier(), true);
         $this->assertEquals($doctrinePropertyMetadata->isWritable(), true);
@@ -148,7 +131,7 @@ class DoctrineOrmPropertyMetadataFactoryTest extends TestCase
 
         $doctrineOrmPropertyMetadataFactory = new DoctrineOrmPropertyMetadataFactory($managerRegistry->reveal(), $propertyMetadataFactory->reveal());
 
-        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id', []);
+        $doctrinePropertyMetadata = $doctrineOrmPropertyMetadataFactory->create(Dummy::class, 'id');
 
         $this->assertEquals($doctrinePropertyMetadata->isIdentifier(), true);
         $this->assertEquals($doctrinePropertyMetadata->isWritable(), false);

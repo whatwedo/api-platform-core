@@ -16,8 +16,8 @@ namespace ApiPlatform\Core\Tests\Fixtures\TestBundle\DataProvider;
 use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
 use ApiPlatform\Core\DataProvider\RestrictedDataProviderInterface;
-use ApiPlatform\Core\Tests\Fixtures\TestBundle\OtherResources\ResourceInterface;
-use ApiPlatform\Core\Tests\Fixtures\TestBundle\OtherResources\ResourceInterfaceImplementation;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Model\ResourceInterface;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Model\ResourceInterfaceImplementation;
 
 class ResourceInterfaceImplementationDataProvider implements ItemDataProviderInterface, CollectionDataProviderInterface, RestrictedDataProviderInterface
 {
@@ -28,7 +28,11 @@ class ResourceInterfaceImplementationDataProvider implements ItemDataProviderInt
 
     public function getItem(string $resourceClass, $id, string $operationName = null, array $context = [])
     {
-        return (new ResourceInterfaceImplementation())->setFoo('single item');
+        if ('some-id' === $id) {
+            return (new ResourceInterfaceImplementation())->setFoo('single item');
+        }
+
+        return null;
     }
 
     public function getCollection(string $resourceClass, string $operationName = null)

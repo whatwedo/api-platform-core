@@ -11,11 +11,13 @@
 
 declare(strict_types=1);
 
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Address as AddressDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Answer as AnswerDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeItem as CompositeItemDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeLabel as CompositeLabelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositePrimitiveItem as CompositePrimitiveItemDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeRelation as CompositeRelationDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Customer as CustomerDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Dummy as DummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyAggregateOffer as DummyAggregateOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCar as DummyCarDocument;
@@ -29,6 +31,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyGroup as DummyGroup
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyOffer as DummyOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyProduct as DummyProductDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyProperty as DummyPropertyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyTableInheritanceNotApiResourceChild as DummyTableInheritanceNotApiResourceChildDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\EmbeddableDummy as EmbeddableDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\EmbeddedDummy as EmbeddedDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FileConfigDummy as FileConfigDummyDocument;
@@ -37,9 +40,11 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FooDummy as FooDummyDocu
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FourthLevel as FourthLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Greeting as GreetingDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\MaxDepthDummy as MaxDepthDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Order as OrderDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Person as PersonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\PersonToPet as PersonToPetDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Pet as PetDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Product as ProductDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Question as QuestionDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedDummy as RelatedDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedOwnedDummy as RelatedOwnedDummyDocument;
@@ -47,14 +52,17 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedOwningDummy as Re
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedToDummyFriend as RelatedToDummyFriendDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelationEmbedder as RelationEmbedderDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\SecuredDummy as SecuredDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Taxon as TaxonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ThirdLevel as ThirdLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\User as UserDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Address;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Answer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeLabel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositePrimitiveItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeRelation;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Container;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Customer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyAggregateOffer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCar;
@@ -69,18 +77,23 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyImmutableDate;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyOffer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyProduct;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyProperty;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyTableInheritanceNotApiResourceChild;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\EmbeddableDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\EmbeddedDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ExternalUser;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FileConfigDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Foo;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FooDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FourthLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Greeting;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\InternalUser;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\MaxDepthDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Node;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Order;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Person;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PersonToPet;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Pet;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Product;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Question;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RamseyUuidDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
@@ -89,14 +102,18 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedOwningDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedToDummyFriend;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelationEmbedder;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\SecuredDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Site;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Taxon;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ThirdLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\User;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UuidIdentifierDummy;
 use Behat\Behat\Context\Context;
+use Behat\Gherkin\Node\PyStringNode;
 use Doctrine\Common\Persistence\ManagerRegistry;
 use Doctrine\ODM\MongoDB\DocumentManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 
 /**
  * Defines application features from the specific context.
@@ -108,6 +125,7 @@ final class DoctrineContext implements Context
      */
     private $manager;
     private $doctrine;
+    private $passwordEncoder;
     private $schemaTool;
     private $schemaManager;
     private $classes;
@@ -119,9 +137,10 @@ final class DoctrineContext implements Context
      * You can also pass arbitrary arguments to the
      * context constructor through behat.yml.
      */
-    public function __construct(ManagerRegistry $doctrine)
+    public function __construct(ManagerRegistry $doctrine, UserPasswordEncoderInterface $passwordEncoder)
     {
         $this->doctrine = $doctrine;
+        $this->passwordEncoder = $passwordEncoder;
         $this->manager = $doctrine->getManager();
         $this->schemaTool = $this->manager instanceof EntityManagerInterface ? new SchemaTool($this->manager) : null;
         $this->schemaManager = $this->manager instanceof DocumentManager ? $this->manager->getSchemaManager() : null;
@@ -156,6 +175,17 @@ final class DoctrineContext implements Context
             $this->manager->persist($dummy);
         }
 
+        $this->manager->flush();
+    }
+
+    /**
+     * @When some dummy table inheritance data but not api resource child are created
+     */
+    public function someDummyTableInheritanceDataButNotApiResourceChildAreCreated()
+    {
+        $dummy = $this->buildDummyTableInheritanceNotApiResourceChild();
+        $dummy->setName('Foobarbaz inheritance');
+        $this->manager->persist($dummy);
         $this->manager->flush();
     }
 
@@ -209,7 +239,7 @@ final class DoctrineContext implements Context
             $dummyGroup = $this->buildDummyGroup();
 
             foreach (['foo', 'bar', 'baz', 'qux'] as $property) {
-                $dummyGroup->$property = ucfirst($property).' #'.$i;
+                $dummyGroup->{$property} = ucfirst($property).' #'.$i;
             }
 
             $this->manager->persist($dummyGroup);
@@ -228,7 +258,7 @@ final class DoctrineContext implements Context
             $dummyGroup = $this->buildDummyGroup();
 
             foreach (['foo', 'bar', 'baz'] as $property) {
-                $dummyProperty->$property = $dummyGroup->$property = ucfirst($property).' #'.$i;
+                $dummyProperty->{$property} = $dummyGroup->{$property} = ucfirst($property).' #'.$i;
             }
 
             $dummyProperty->group = $dummyGroup;
@@ -247,7 +277,7 @@ final class DoctrineContext implements Context
     {
         $dummyGroup = $this->buildDummyGroup();
         foreach (['foo', 'bar', 'baz'] as $property) {
-            $dummyGroup->$property = ucfirst($property).' #shared';
+            $dummyGroup->{$property} = ucfirst($property).' #shared';
         }
         $this->manager->persist($dummyGroup);
 
@@ -255,7 +285,7 @@ final class DoctrineContext implements Context
             $dummyProperty = $this->buildDummyProperty();
 
             foreach (['foo', 'bar', 'baz'] as $property) {
-                $dummyProperty->$property = ucfirst($property).' #'.$i;
+                $dummyProperty->{$property} = ucfirst($property).' #'.$i;
             }
 
             $dummyProperty->group = $dummyGroup;
@@ -275,7 +305,7 @@ final class DoctrineContext implements Context
             $dummyProperty = $this->buildDummyProperty();
 
             foreach (['foo', 'bar', 'baz'] as $property) {
-                $dummyProperty->$property = $dummyGroup->$property = ucfirst($property).' #'.$i;
+                $dummyProperty->{$property} = $dummyGroup->{$property} = ucfirst($property).' #'.$i;
             }
 
             $this->manager->persist($dummyGroup);
@@ -301,7 +331,7 @@ final class DoctrineContext implements Context
             $dummyGroup = $this->buildDummyGroup();
 
             foreach (['foo', 'bar', 'baz'] as $property) {
-                $dummyProperty->$property = $dummyGroup->$property = ucfirst($property).' #'.$i;
+                $dummyProperty->{$property} = $dummyGroup->{$property} = ucfirst($property).' #'.$i;
             }
 
             $dummyProperty->group = $dummyGroup;
@@ -311,7 +341,7 @@ final class DoctrineContext implements Context
                 $dummyGroup = $this->buildDummyGroup();
 
                 foreach (['foo', 'bar', 'baz'] as $property) {
-                    $dummyGroup->$property = ucfirst($property).' #'.$i.$j;
+                    $dummyGroup->{$property} = ucfirst($property).' #'.$i.$j;
                 }
 
                 $dummyProperty->groups[] = $dummyGroup;
@@ -919,8 +949,7 @@ final class DoctrineContext implements Context
     public function thePasswordForUserShouldBeHashed(string $password, string $user)
     {
         $user = $this->doctrine->getRepository($this->isOrm() ? User::class : UserDocument::class)->find($user);
-
-        if (!password_verify($password, $user->getPassword())) {
+        if (!$this->passwordEncoder->isPasswordValid($user, $password)) {
             throw new \Exception('User password mismatch');
         }
     }
@@ -1185,17 +1214,17 @@ final class DoctrineContext implements Context
     }
 
     /**
-     * @Given there is a DummyCustomDto
+     * @Given there is a DummyDtoCustom
      */
-    public function thereIsADummyCustomDto()
+    public function thereIsADummyDtoCustom()
     {
-        $this->thereAreNbDummyCustomDto(1);
+        $this->thereAreNbDummyDtoCustom(1);
     }
 
     /**
-     * @Given there are :nb DummyCustomDto
+     * @Given there are :nb DummyDtoCustom
      */
-    public function thereAreNbDummyCustomDto($nb)
+    public function thereAreNbDummyDtoCustom($nb)
     {
         for ($i = 0; $i < $nb; ++$i) {
             $dto = $this->isOrm() ? new DummyDtoCustom() : new DummyDtoCustomDocument();
@@ -1206,6 +1235,110 @@ final class DoctrineContext implements Context
 
         $this->manager->flush();
         $this->manager->clear();
+    }
+
+    /**
+     * @Given there is an order with same customer and recipient
+     */
+    public function thereIsAnOrderWithSameCustomerAndRecipient()
+    {
+        $customer = $this->isOrm() ? new Customer() : new CustomerDocument();
+        $customer->name = 'customer_name';
+
+        $address1 = $this->isOrm() ? new Address() : new AddressDocument();
+        $address1->name = 'foo';
+        $address2 = $this->isOrm() ? new Address() : new AddressDocument();
+        $address2->name = 'bar';
+
+        $order = $this->isOrm() ? new Order() : new OrderDocument();
+        $order->recipient = $customer;
+        $order->customer = $customer;
+
+        $customer->addresses->add($address1);
+        $customer->addresses->add($address2);
+
+        $this->manager->persist($address1);
+        $this->manager->persist($address2);
+        $this->manager->persist($customer);
+        $this->manager->persist($order);
+
+        $this->manager->flush();
+        $this->manager->clear();
+    }
+
+    /**
+     * @Given there are :nb sites with internal owner
+     */
+    public function thereAreSitesWithInternalOwner(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $internalUser = new InternalUser();
+            $internalUser->setFirstname('Internal');
+            $internalUser->setLastname('User');
+            $internalUser->setEmail('john.doe@example.com');
+            $internalUser->setInternalId('INT');
+            $site = new Site();
+            $site->setTitle('title');
+            $site->setDescription('description');
+            $site->setOwner($internalUser);
+            $this->manager->persist($site);
+        }
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb sites with external owner
+     */
+    public function thereAreSitesWithExternalOwner(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $externalUser = new ExternalUser();
+            $externalUser->setFirstname('External');
+            $externalUser->setLastname('User');
+            $externalUser->setEmail('john.doe@example.com');
+            $externalUser->setExternalId('EXT');
+            $site = new Site();
+            $site->setTitle('title');
+            $site->setDescription('description');
+            $site->setOwner($externalUser);
+            $this->manager->persist($site);
+        }
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is the following taxon:
+     */
+    public function thereIsTheFollowingTaxon(PyStringNode $dataNode): void
+    {
+        $data = json_decode((string) $dataNode, true);
+
+        $taxon = $this->isOrm() ? new Taxon() : new TaxonDocument();
+        $taxon->setCode($data['code']);
+        $this->manager->persist($taxon);
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is the following product:
+     */
+    public function thereIsTheFollowingProduct(PyStringNode $dataNode): void
+    {
+        $data = json_decode((string) $dataNode, true);
+
+        $product = $this->isOrm() ? new Product() : new ProductDocument();
+        $product->setCode($data['code']);
+        if (isset($data['mainTaxon'])) {
+            $mainTaxonCode = str_replace('/taxons/', '', $data['mainTaxon']);
+            $mainTaxon = $this->manager->getRepository($this->isOrm() ? Taxon::class : TaxonDocument::class)->findOneBy([
+                'code' => $mainTaxonCode,
+            ]);
+            $product->setMainTaxon($mainTaxon);
+        }
+        $this->manager->persist($product);
+
+        $this->manager->flush();
     }
 
     private function isOrm(): bool
@@ -1264,6 +1397,14 @@ final class DoctrineContext implements Context
     private function buildDummy()
     {
         return $this->isOrm() ? new Dummy() : new DummyDocument();
+    }
+
+    /**
+     * @return DummyTableInheritanceNotApiResourceChild|DummyTableInheritanceNotApiResourceChildDocument
+     */
+    private function buildDummyTableInheritanceNotApiResourceChild()
+    {
+        return $this->isOrm() ? new DummyTableInheritanceNotApiResourceChild() : new DummyTableInheritanceNotApiResourceChildDocument();
     }
 
     /**

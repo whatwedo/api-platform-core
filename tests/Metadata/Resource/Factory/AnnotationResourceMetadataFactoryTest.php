@@ -22,7 +22,6 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use Doctrine\Common\Annotations\Reader;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
-use Prophecy\Prophecy\ProphecyInterface;
 
 /**
  * @author Kévin Dunglas <dunglas@gmail.com>
@@ -32,7 +31,7 @@ class AnnotationResourceMetadataFactoryTest extends TestCase
     /**
      * @dataProvider getCreateDependencies
      */
-    public function testCreate(ProphecyInterface $reader, ProphecyInterface $decorated = null, string $expectedShortName, string $expectedDescription)
+    public function testCreate($reader, $decorated, string $expectedShortName, string $expectedDescription)
     {
         $factory = new AnnotationResourceMetadataFactory($reader->reveal(), $decorated ? $decorated->reveal() : null);
         $metadata = $factory->create(Dummy::class);
@@ -45,6 +44,17 @@ class AnnotationResourceMetadataFactoryTest extends TestCase
         $this->assertEquals(['sub' => ['bus' => false]], $metadata->getSubresourceOperations());
         $this->assertEquals(['a' => 1, 'route_prefix' => '/foobar'], $metadata->getAttributes());
         $this->assertEquals(['foo' => 'bar'], $metadata->getGraphql());
+    }
+
+    public function testCreateWithoutAttributes()
+    {
+        $annotation = new ApiResource([]);
+        $reader = $this->prophesize(Reader::class);
+        $reader->getClassAnnotation(Argument::type(\ReflectionClass::class), ApiResource::class)->willReturn($annotation)->shouldBeCalled();
+        $factory = new AnnotationResourceMetadataFactory($reader->reveal(), null);
+        $metadata = $factory->create(Dummy::class);
+
+        $this->assertNull($metadata->getAttributes());
     }
 
     public function getCreateDependencies()

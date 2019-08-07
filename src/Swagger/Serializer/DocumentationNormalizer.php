@@ -47,17 +47,17 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
 {
     use FilterLocatorTrait;
 
-    const FORMAT = 'json';
-    const BASE_URL = 'base_url';
-    const SPEC_VERSION = 'spec_version';
-    const OPENAPI_VERSION = '3.0.2';
-    const SWAGGER_DEFINITION_NAME = 'swagger_definition_name';
-    const SWAGGER_VERSION = '2.0';
+    public const FORMAT = 'json';
+    public const BASE_URL = 'base_url';
+    public const SPEC_VERSION = 'spec_version';
+    public const OPENAPI_VERSION = '3.0.2';
+    public const SWAGGER_DEFINITION_NAME = 'swagger_definition_name';
+    public const SWAGGER_VERSION = '2.0';
 
     /**
      * @deprecated
      */
-    const ATTRIBUTE_NAME = 'swagger_context';
+    public const ATTRIBUTE_NAME = 'swagger_context';
 
     private $resourceMetadataFactory;
     private $propertyNameCollectionFactory;
@@ -204,7 +204,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
                 $parametersMemory = [];
                 $pathOperation['parameters'] = [];
 
-                foreach ($subresourceOperation['identifiers'] as list($identifier, , $hasIdentifier)) {
+                foreach ($subresourceOperation['identifiers'] as [$identifier, , $hasIdentifier]) {
                     if (true === $hasIdentifier) {
                         $parameter = [
                             'name' => $identifier,
@@ -390,13 +390,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
 
         $pathOperation['summary'] ?? $pathOperation['summary'] = sprintf('Retrieves a %s resource.', $resourceShortName);
 
-        $parameter = [
-            'name' => 'id',
-            'in' => 'path',
-            'required' => true,
-        ];
-        $v3 ? $parameter['schema'] = ['type' => 'string'] : $parameter['type'] = 'string';
-        $pathOperation['parameters'] ?? $pathOperation['parameters'] = [$parameter];
+        $pathOperation = $this->addItemOperationParameters($v3, $pathOperation);
 
         $successResponse = ['description' => sprintf('%s resource response', $resourceShortName)];
         if ($responseDefinitionKey) {
@@ -423,6 +417,11 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
         }
 
         $pathOperation['summary'] ?? $pathOperation['summary'] = sprintf('Creates a %s resource.', $resourceShortName);
+
+        $userDefinedParameters = $pathOperation['parameters'] ?? null;
+        if (OperationType::ITEM === $operationType) {
+            $pathOperation = $this->addItemOperationParameters($v3, $pathOperation);
+        }
 
         $responseDefinitionKey = false;
         $outputMetadata = $resourceMetadata->getTypedOperationAttribute($operationType, $operationName, 'output', ['class' => $resourceClass], true);
@@ -460,12 +459,12 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
                 'description' => sprintf('The new %s resource', $resourceShortName),
             ];
         } else {
-            $pathOperation['parameters'] ?? $pathOperation['parameters'] = [[
+            $userDefinedParameters ?? $pathOperation['parameters'][] = [
                 'name' => lcfirst($resourceShortName),
                 'in' => 'body',
                 'description' => sprintf('The new %s resource', $resourceShortName),
                 'schema' => ['$ref' => sprintf('#/definitions/%s', $requestDefinitionKey)],
-            ]];
+            ];
         }
 
         return $pathOperation;
@@ -480,13 +479,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
 
         $pathOperation['summary'] ?? $pathOperation['summary'] = sprintf('Replaces the %s resource.', $resourceShortName);
 
-        $parameter = [
-            'name' => 'id',
-            'in' => 'path',
-            'required' => true,
-        ];
-        $v3 ? $parameter['schema'] = ['type' => 'string'] : $parameter['type'] = 'string';
-        $pathOperation['parameters'] ?? $pathOperation['parameters'] = [$parameter];
+        $pathOperation = $this->addItemOperationParameters($v3, $pathOperation);
 
         $responseDefinitionKey = false;
         $outputMetadata = $resourceMetadata->getTypedOperationAttribute($operationType, $operationName, 'output', ['class' => $resourceClass], true);
@@ -540,13 +533,17 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
             '404' => ['description' => 'Resource not found'],
         ];
 
+        return $this->addItemOperationParameters($v3, $pathOperation);
+    }
+
+    private function addItemOperationParameters(bool $v3, \ArrayObject $pathOperation): \ArrayObject
+    {
         $parameter = [
             'name' => 'id',
             'in' => 'path',
             'required' => true,
         ];
         $v3 ? $parameter['schema'] = ['type' => 'string'] : $parameter['type'] = 'string';
-
         $pathOperation['parameters'] ?? $pathOperation['parameters'] = [$parameter];
 
         return $pathOperation;
@@ -598,6 +595,10 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
         $options = isset($serializerContext[AbstractNormalizer::GROUPS]) ? ['serializer_groups' => $serializerContext[AbstractNormalizer::GROUPS]] : [];
         foreach ($this->propertyNameCollectionFactory->create($resourceClass, $options) as $propertyName) {
             $propertyMetadata = $this->propertyMetadataFactory->create($resourceClass, $propertyName);
+            if (!$propertyMetadata->isReadable() && !$propertyMetadata->isWritable()) {
+                continue;
+            }
+
             $normalizedPropertyName = $this->nameConverter ? $this->nameConverter->normalize($propertyName, $resourceClass, self::FORMAT, $serializerContext ?? []) : $propertyName;
             if ($propertyMetadata->isRequired()) {
                 $definitionSchema['required'][] = $normalizedPropertyName;
@@ -647,7 +648,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
     /**
      * Gets the Swagger's type corresponding to the given PHP's type.
      */
-    private function getType(bool $v3, string $type, bool $isCollection, string $className = null, bool $readableLink = null, \ArrayObject $definitions, array $serializerContext = null): array
+    private function getType(bool $v3, string $type, bool $isCollection, ?string $className, ?bool $readableLink, \ArrayObject $definitions, array $serializerContext = null): array
     {
         if ($isCollection) {
             return ['type' => 'array', 'items' => $this->getType($v3, $type, false, $className, $readableLink, $definitions, $serializerContext)];
@@ -701,7 +702,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
 
         if ($v3) {
             $docs = ['openapi' => self::OPENAPI_VERSION];
-            if ('/' !== $baseUrl) {
+            if ('/' !== $baseUrl && '' !== $baseUrl) {
                 $docs['servers'] = [['url' => $context[self::BASE_URL] ?? $this->defaultContext[self::BASE_URL]]];
             }
         } else {
@@ -873,7 +874,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
     private function getLinkObject(string $resourceClass, string $operationId, string $path): array
     {
         $linkObject = $identifiers = [];
-        foreach ($this->propertyNameCollectionFactory->create($resourceClass, []) as $propertyName) {
+        foreach ($this->propertyNameCollectionFactory->create($resourceClass) as $propertyName) {
             $propertyMetadata = $this->propertyMetadataFactory->create($resourceClass, $propertyName);
             if (!$propertyMetadata->isIdentifier()) {
                 continue;

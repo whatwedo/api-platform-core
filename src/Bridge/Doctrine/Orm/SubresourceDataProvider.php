@@ -48,7 +48,7 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
      * @param QueryCollectionExtensionInterface[] $collectionExtensions
      * @param QueryItemExtensionInterface[]       $itemExtensions
      */
-    public function __construct(ManagerRegistry $managerRegistry, PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, /* iterable */ $collectionExtensions = [], /* iterable */ $itemExtensions = [])
+    public function __construct(ManagerRegistry $managerRegistry, PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, iterable $collectionExtensions = [], iterable $itemExtensions = [])
     {
         $this->managerRegistry = $managerRegistry;
         $this->propertyNameCollectionFactory = $propertyNameCollectionFactory;
@@ -130,7 +130,7 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
 
         $topQueryBuilder = $topQueryBuilder ?? $previousQueryBuilder;
 
-        list($identifier, $identifierResourceClass) = $context['identifiers'][$remainingIdentifiers - 1];
+        [$identifier, $identifierResourceClass] = $context['identifiers'][$remainingIdentifiers - 1];
         $previousAssociationProperty = $context['identifiers'][$remainingIdentifiers][0] ?? $context['property'];
 
         $manager = $this->managerRegistry->getManagerForClass($identifierResourceClass);

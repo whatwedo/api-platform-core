@@ -28,6 +28,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\UnitOfWork;
 use PHPUnit\Framework\TestCase;
+use Prophecy\Argument;
 use Symfony\Component\Mercure\Update;
 use Symfony\Component\Serializer\SerializerInterface;
 
@@ -52,6 +53,9 @@ class PublishMercureUpdatesListenerTest extends TestCase
         $toDeleteExpressionLanguage->setId(4);
 
         $resourceClassResolverProphecy = $this->prophesize(ResourceClassResolverInterface::class);
+        $resourceClassResolverProphecy->getResourceClass(Argument::type(Dummy::class))->willReturn(Dummy::class);
+        $resourceClassResolverProphecy->getResourceClass(Argument::type(DummyCar::class))->willReturn(DummyCar::class);
+        $resourceClassResolverProphecy->getResourceClass(Argument::type(DummyFriend::class))->willReturn(DummyFriend::class);
         $resourceClassResolverProphecy->isResourceClass(Dummy::class)->willReturn(true);
         $resourceClassResolverProphecy->isResourceClass(NotAResource::class)->willReturn(false);
         $resourceClassResolverProphecy->isResourceClass(DummyCar::class)->willReturn(true);
@@ -66,13 +70,15 @@ class PublishMercureUpdatesListenerTest extends TestCase
         $iriConverterProphecy->getIriFromItem($toDeleteExpressionLanguage, UrlGeneratorInterface::ABS_URL)->willReturn('http://example.com/dummy_friends/4')->shouldBeCalled();
 
         $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
-        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata(null, null, null, null, null, ['mercure' => true]));
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata(null, null, null, null, null, ['mercure' => true, 'normalization_context' => ['groups' => ['foo', 'bar']]]));
         $resourceMetadataFactoryProphecy->create(DummyCar::class)->willReturn(new ResourceMetadata());
         $resourceMetadataFactoryProphecy->create(DummyFriend::class)->willReturn(new ResourceMetadata(null, null, null, null, null, ['mercure' => "['foo', 'bar']"]));
 
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->serialize($toInsert, 'jsonld')->willReturn('1');
-        $serializerProphecy->serialize($toUpdate, 'jsonld')->willReturn('2');
+        $serializerProphecy->serialize($toInsert, 'jsonld', ['groups' => ['foo', 'bar']])->willReturn('1');
+        $serializerProphecy->serialize($toUpdate, 'jsonld', ['groups' => ['foo', 'bar']])->willReturn('2');
+
+        $formats = ['jsonld' => ['application/ld+json'], 'jsonhal' => ['application/hal+json']];
 
         $topics = [];
         $targets = [];
@@ -88,6 +94,7 @@ class PublishMercureUpdatesListenerTest extends TestCase
             $iriConverterProphecy->reveal(),
             $resourceMetadataFactoryProphecy->reveal(),
             $serializerProphecy->reveal(),
+            $formats,
             null,
             $publisher
         );
@@ -113,11 +120,12 @@ class PublishMercureUpdatesListenerTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('A message bus or a publisher must be provided.');
 
-        $listener = new PublishMercureUpdatesListener(
+        new PublishMercureUpdatesListener(
             $this->prophesize(ResourceClassResolverInterface::class)->reveal(),
             $this->prophesize(IriConverterInterface::class)->reveal(),
             $this->prophesize(ResourceMetadataFactoryInterface::class)->reveal(),
             $this->prophesize(SerializerInterface::class)->reveal(),
+            ['jsonld' => ['application/ld+json'], 'jsonhal' => ['application/hal+json']],
             null,
             null
         );
@@ -131,6 +139,7 @@ class PublishMercureUpdatesListenerTest extends TestCase
         $toInsert = new Dummy();
 
         $resourceClassResolverProphecy = $this->prophesize(ResourceClassResolverInterface::class);
+        $resourceClassResolverProphecy->getResourceClass(Argument::type(Dummy::class))->willReturn(Dummy::class);
         $resourceClassResolverProphecy->isResourceClass(Dummy::class)->willReturn(true);
 
         $iriConverterProphecy = $this->prophesize(IriConverterInterface::class);
@@ -145,6 +154,7 @@ class PublishMercureUpdatesListenerTest extends TestCase
             $iriConverterProphecy->reveal(),
             $resourceMetadataFactoryProphecy->reveal(),
             $serializerProphecy->reveal(),
+            ['jsonld' => ['application/ld+json'], 'jsonhal' => ['application/hal+json']],
             null,
             function (Update $update): string {
                 return 'will never be called';

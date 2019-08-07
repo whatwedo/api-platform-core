@@ -16,20 +16,19 @@ namespace ApiPlatform\Core\Bridge\Symfony\Bundle\DependencyInjection;
 use ApiPlatform\Core\Api\FilterInterface;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\AggregationCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Extension\AggregationItemExtensionInterface;
+use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\AbstractFilter as DoctrineMongoDbOdmAbstractFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\EagerLoadingExtension;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\FilterEagerLoadingExtension;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryCollectionExtensionInterface as DoctrineQueryCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryItemExtensionInterface;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\AbstractContextAwareFilter as DoctrineOrmAbstractContextAwareFilter;
 use ApiPlatform\Core\Bridge\Elasticsearch\DataProvider\Extension\RequestBodySearchCollectionExtensionInterface;
 use ApiPlatform\Core\DataPersister\DataPersisterInterface;
 use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
 use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
 use ApiPlatform\Core\DataTransformer\DataTransformerInterface;
-use ApiPlatform\Core\Exception\RuntimeException;
 use Doctrine\Common\Annotations\Annotation;
-use Doctrine\ORM\Version;
-use Elasticsearch\Client;
 use phpDocumentor\Reflection\DocBlockFactoryInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -37,11 +36,16 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Resource\DirectoryResource;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\DependencyInjection\Exception\RuntimeException;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Yaml\Yaml;
 
@@ -55,49 +59,56 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
     /**
      * {@inheritdoc}
      */
-    public function prepend(ContainerBuilder $container)
+    public function prepend(ContainerBuilder $container): void
     {
-        if (!$frameworkConfiguration = $container->getExtensionConfig('framework')) {
-            return;
-        }
-
-        $serializerConfig = $propertyInfoConfig = null;
-
-        foreach ($frameworkConfiguration as $frameworkParameters) {
-            if (isset($frameworkParameters['serializer'])) {
-                $serializerConfig = $serializerConfig ?? $frameworkParameters['serializer'];
-            }
-
-            if (isset($frameworkParameters['property_info'])) {
-                $propertyInfoConfig = $propertyInfoConfig ?? $frameworkParameters['property_info'];
-            }
-        }
-
-        if (!isset($serializerConfig['enabled'])) {
-            $container->prependExtensionConfig('framework', ['serializer' => ['enabled' => true]]);
-        }
-
-        if (!isset($propertyInfoConfig['enabled'])) {
-            $container->prependExtensionConfig('framework', ['property_info' => ['enabled' => true]]);
+        if (isset($container->getExtensions()['framework'])) {
+            $container->prependExtensionConfig('framework', [
+                'serializer' => [
+                    'enabled' => true,
+                ],
+            ]);
+            $container->prependExtensionConfig('framework', [
+                'property_info' => [
+                    'enabled' => true,
+                ],
+            ]);
         }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function load(array $configs, ContainerBuilder $container)
+    public function load(array $configs, ContainerBuilder $container): void
     {
+        $loader = new XmlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
+
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
+
         $formats = $this->getFormats($config['formats']);
         $errorFormats = $this->getFormats($config['error_formats']);
-        $this->handleConfig($container, $config, $formats, $errorFormats);
 
-        $loader = new XmlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
-        $loader->load('api.xml');
-        $loader->load('data_persister.xml');
-        $loader->load('data_provider.xml');
-        $loader->load('filter.xml');
+        $this->registerCommonConfiguration($container, $config, $loader, $formats, $errorFormats);
+        $this->registerMetadataConfiguration($container, $config, $loader);
+        $this->registerOAuthConfiguration($container, $config);
+        $this->registerSwaggerConfiguration($container, $config, $loader);
+        $this->registerJsonApiConfiguration($formats, $loader);
+        $this->registerJsonLdHydraConfiguration($container, $formats, $loader, $config['enable_docs']);
+        $this->registerJsonHalConfiguration($formats, $loader);
+        $this->registerJsonProblemConfiguration($errorFormats, $loader);
+        $this->registerGraphQlConfiguration($container, $config, $loader);
+        $this->registerLegacyBundlesConfiguration($container, $config, $loader);
+        $this->registerCacheConfiguration($container);
+        $this->registerDoctrineOrmConfiguration($container, $config, $loader);
+        $this->registerDoctrineMongoDbOdmConfiguration($container, $config, $loader);
+        $this->registerHttpCacheConfiguration($container, $config, $loader);
+        $this->registerValidatorConfiguration($container, $config, $loader);
+        $this->registerDataCollectorConfiguration($container, $config, $loader);
+        $this->registerMercureConfiguration($container, $config, $loader);
+        $this->registerMessengerConfiguration($container, $config, $loader);
+        $this->registerElasticsearchConfiguration($container, $config, $loader);
+        $this->registerDataTransformerConfiguration($container);
+        $this->registerSecurityConfiguration($container, $loader);
 
         $container->registerForAutoconfiguration(DataPersisterInterface::class)
             ->addTag('api_platform.data_persister');
@@ -109,52 +120,19 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             ->addTag('api_platform.subresource_data_provider');
         $container->registerForAutoconfiguration(FilterInterface::class)
             ->addTag('api_platform.filter');
+    }
 
-        if (interface_exists(ValidatorInterface::class)) {
-            $loader->load('validator.xml');
-        }
-
-        $bundles = $container->getParameter('kernel.bundles');
-        if (isset($bundles['SecurityBundle'])) {
-            if (class_exists(ExpressionLanguage::class)) {
-                $loader->load('security_expression_language.xml');
-            }
-            $loader->load('security.xml');
-        }
+    private function registerCommonConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader, array $formats, array $errorFormats): void
+    {
+        $loader->load('api.xml');
+        $loader->load('data_persister.xml');
+        $loader->load('data_provider.xml');
+        $loader->load('filter.xml');
 
         if (class_exists(Uuid::class)) {
             $loader->load('ramsey_uuid.xml');
         }
 
-        $useDoctrine = $config['doctrine']['enabled'] && isset($bundles['DoctrineBundle']) && class_exists(Version::class);
-
-        $this->registerMetadataConfiguration($container, $config, $loader);
-        $this->registerOAuthConfiguration($container, $config);
-        $this->registerApiKeysConfiguration($container, $config);
-        $this->registerSwaggerConfiguration($container, $config, $loader);
-        $this->registerJsonApiConfiguration($formats, $loader);
-        $this->registerJsonLdConfiguration($container, $formats, $loader, $config['enable_docs']);
-        $this->registerJsonHalConfiguration($formats, $loader);
-        $this->registerJsonProblemConfiguration($errorFormats, $loader);
-        $this->registerGraphqlConfiguration($container, $config, $loader);
-        $this->registerBundlesConfiguration($bundles, $config, $loader);
-        $this->registerCacheConfiguration($container);
-        $this->registerDoctrineConfiguration($container, $config, $loader, $useDoctrine);
-        $this->registerDoctrineMongoDbOdmConfiguration($container, $config, $loader);
-        $this->registerHttpCacheConfiguration($container, $config, $loader, $useDoctrine);
-        $this->registerValidatorConfiguration($container, $config);
-        $this->registerDataCollectorConfiguration($container, $config, $loader);
-        $this->registerMercureConfiguration($container, $config, $loader, $useDoctrine);
-        $this->registerMessengerConfiguration($config, $loader);
-        $this->registerElasticsearchConfiguration($container, $config, $loader);
-        $this->registerDataTransformerConfiguration($container);
-    }
-
-    /**
-     * Handles configuration.
-     */
-    private function handleConfig(ContainerBuilder $container, array $config, array $formats, array $errorFormats)
-    {
         $container->setParameter('api_platform.enable_entrypoint', $config['enable_entrypoint']);
         $container->setParameter('api_platform.enable_docs', $config['enable_docs']);
         $container->setParameter('api_platform.title', $config['title']);
@@ -165,13 +143,13 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.formats', $formats);
         $container->setParameter('api_platform.error_formats', $errorFormats);
         $container->setParameter('api_platform.allow_plain_identifiers', $config['allow_plain_identifiers']);
-        $container->setParameter('api_platform.eager_loading.enabled', $config['eager_loading']['enabled']);
+        $container->setParameter('api_platform.eager_loading.enabled', $this->isConfigEnabled($container, $config['eager_loading']));
         $container->setParameter('api_platform.eager_loading.max_joins', $config['eager_loading']['max_joins']);
         $container->setParameter('api_platform.eager_loading.fetch_partial', $config['eager_loading']['fetch_partial']);
         $container->setParameter('api_platform.eager_loading.force_eager', $config['eager_loading']['force_eager']);
         $container->setParameter('api_platform.collection.order', $config['collection']['order']);
         $container->setParameter('api_platform.collection.order_parameter_name', $config['collection']['order_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.enabled', $config['collection']['pagination']['enabled']);
+        $container->setParameter('api_platform.collection.pagination.enabled', $this->isConfigEnabled($container, $config['collection']['pagination']));
         $container->setParameter('api_platform.collection.pagination.partial', $config['collection']['pagination']['partial']);
         $container->setParameter('api_platform.collection.pagination.client_enabled', $config['collection']['pagination']['client_enabled']);
         $container->setParameter('api_platform.collection.pagination.client_items_per_page', $config['collection']['pagination']['client_items_per_page']);
@@ -197,15 +175,12 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         }
     }
 
-    /**
-     * Registers metadata configuration.
-     */
-    private function registerMetadataConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerMetadataConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
         $loader->load('metadata/metadata.xml');
         $loader->load('metadata/xml.xml');
 
-        list($xmlResources, $yamlResources) = $this->getResourcesToWatch($container, $config);
+        [$xmlResources, $yamlResources] = $this->getResourcesToWatch($container, $config);
 
         if (!empty($config['resource_class_directories'])) {
             $container->setParameter('api_platform.resource_class_directories', array_merge(
@@ -239,10 +214,10 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             foreach (['.yaml', '.yml', '.xml', ''] as $extension) {
                 $paths[] = "$dirname/Resources/config/api_resources$extension";
             }
-            if ($config['doctrine']['enabled']) {
+            if ($this->isConfigEnabled($container, $config['doctrine'])) {
                 $paths[] = "$dirname/Entity";
             }
-            if ($config['doctrine_mongodb_odm']['enabled']) {
+            if ($this->isConfigEnabled($container, $config['doctrine_mongodb_odm'])) {
                 $paths[] = "$dirname/Document";
             }
 
@@ -282,7 +257,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
 
             if ($container->fileExists($path, false)) {
                 if (!preg_match('/\.(xml|ya?ml)$/', $path, $matches)) {
-                    throw new RuntimeException(sprintf('Unsupported mapping type in "%s", supported types are XML & Yaml.', $path));
+                    throw new RuntimeException(sprintf('Unsupported mapping type in "%s", supported types are XML & YAML.', $path));
                 }
 
                 $resources['yaml' === $matches[1] ? 'yml' : $matches[1]][] = $path;
@@ -298,16 +273,13 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         return [$resources['xml'], $resources['yml']];
     }
 
-    /**
-     * Registers the OAuth configuration.
-     */
-    private function registerOAuthConfiguration(ContainerBuilder $container, array $config)
+    private function registerOAuthConfiguration(ContainerBuilder $container, array $config): void
     {
         if (!$config['oauth']) {
             return;
         }
 
-        $container->setParameter('api_platform.oauth.enabled', $config['oauth']['enabled']);
+        $container->setParameter('api_platform.oauth.enabled', $this->isConfigEnabled($container, $config['oauth']));
         $container->setParameter('api_platform.oauth.clientId', $config['oauth']['clientId']);
         $container->setParameter('api_platform.oauth.clientSecret', $config['oauth']['clientSecret']);
         $container->setParameter('api_platform.oauth.type', $config['oauth']['type']);
@@ -318,17 +290,9 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
     }
 
     /**
-     * Registers the api keys configuration.
-     */
-    private function registerApiKeysConfiguration(ContainerBuilder $container, array $config)
-    {
-        $container->setParameter('api_platform.swagger.api_keys', $config['swagger']['api_keys']);
-    }
-
-    /**
      * Registers the Swagger, ReDoc and Swagger UI configuration.
      */
-    private function registerSwaggerConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerSwaggerConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
         if (!$config['enable_swagger']) {
             return;
@@ -343,12 +307,10 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         }
 
         $container->setParameter('api_platform.enable_swagger', $config['enable_swagger']);
+        $container->setParameter('api_platform.swagger.api_keys', $config['swagger']['api_keys']);
     }
 
-    /**
-     * Registers the JsonApi configuration.
-     */
-    private function registerJsonApiConfiguration(array $formats, XmlFileLoader $loader)
+    private function registerJsonApiConfiguration(array $formats, XmlFileLoader $loader): void
     {
         if (!isset($formats['jsonapi'])) {
             return;
@@ -357,10 +319,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $loader->load('jsonapi.xml');
     }
 
-    /**
-     * Registers the JSON-LD and Hydra configuration.
-     */
-    private function registerJsonLdConfiguration(ContainerBuilder $container, array $formats, XmlFileLoader $loader, bool $docEnabled)
+    private function registerJsonLdHydraConfiguration(ContainerBuilder $container, array $formats, XmlFileLoader $loader, bool $docEnabled): void
     {
         if (!isset($formats['jsonld'])) {
             return;
@@ -374,10 +333,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         }
     }
 
-    /**
-     * Registers the HAL configuration.
-     */
-    private function registerJsonHalConfiguration(array $formats, XmlFileLoader $loader)
+    private function registerJsonHalConfiguration(array $formats, XmlFileLoader $loader): void
     {
         if (!isset($formats['jsonhal'])) {
             return;
@@ -386,10 +342,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $loader->load('hal.xml');
     }
 
-    /**
-     * Registers the JSON Problem configuration.
-     */
-    private function registerJsonProblemConfiguration(array $errorFormats, XmlFileLoader $loader)
+    private function registerJsonProblemConfiguration(array $errorFormats, XmlFileLoader $loader): void
     {
         if (!isset($errorFormats['jsonproblem'])) {
             return;
@@ -398,63 +351,63 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $loader->load('problem.xml');
     }
 
-    /**
-     * Registers the GraphQL configuration.
-     */
-    private function registerGraphqlConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerGraphQlConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        if (!$config['graphql']) {
+        $enabled = $this->isConfigEnabled($container, $config['graphql']);
+
+        $container->setParameter('api_platform.graphql.enabled', $enabled);
+
+        if (!$enabled) {
             return;
         }
 
-        $container->setParameter('api_platform.graphql.enabled', $config['graphql']['enabled']);
-        $container->setParameter('api_platform.graphql.graphiql.enabled', $config['graphql']['graphiql']['enabled']);
+        $container->setParameter('api_platform.graphql.graphiql.enabled', $this->isConfigEnabled($container, $config['graphql']['graphiql']));
 
         $loader->load('graphql.xml');
     }
 
-    /**
-     * Registers configuration for integration with third-party bundles.
-     *
-     * @param string[] $bundles
-     */
-    private function registerBundlesConfiguration(array $bundles, array $config, XmlFileLoader $loader)
+    private function registerLegacyBundlesConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        // FOSUser support
+        /** @var string[] $bundles */
+        $bundles = $container->getParameter('kernel.bundles');
+
         if (isset($bundles['FOSUserBundle']) && $config['enable_fos_user']) {
             $loader->load('fos_user.xml');
         }
 
-        // NelmioApiDoc support
         if (isset($bundles['NelmioApiDocBundle']) && $config['enable_nelmio_api_doc']) {
             $loader->load('nelmio_api_doc.xml');
         }
     }
 
-    /**
-     * Registers the cache configuration.
-     */
-    private function registerCacheConfiguration(ContainerBuilder $container)
+    private function registerCacheConfiguration(ContainerBuilder $container): void
     {
-        // Don't use system cache pool in dev
-        if ($container->hasParameter('api_platform.metadata_cache') ? $container->getParameter('api_platform.metadata_cache') : !$container->getParameter('kernel.debug')) {
+        if (!$container->hasParameter('kernel.debug') || !$container->getParameter('kernel.debug')) {
+            $container->removeDefinition('api_platform.cache_warmer.cache_pool_clearer');
+        }
+
+        if (!$container->hasParameter('api_platform.metadata_cache')) {
             return;
         }
 
-        $container->register('api_platform.cache.metadata.property', ArrayAdapter::class);
-        $container->register('api_platform.cache.metadata.resource', ArrayAdapter::class);
-        $container->register('api_platform.cache.route_name_resolver', ArrayAdapter::class);
-        $container->register('api_platform.cache.identifiers_extractor', ArrayAdapter::class);
-        $container->register('api_platform.cache.subresource_operation_factory', ArrayAdapter::class);
-        $container->register('api_platform.elasticsearch.cache.metadata.document', ArrayAdapter::class);
+        @trigger_error('The "api_platform.metadata_cache" parameter is deprecated since version 2.4 and will have no effect in 3.0.', E_USER_DEPRECATED);
+
+        // BC
+        if (!$container->getParameter('api_platform.metadata_cache')) {
+            $container->removeDefinition('api_platform.cache_warmer.cache_pool_clearer');
+
+            $container->register('api_platform.cache.metadata.property', ArrayAdapter::class);
+            $container->register('api_platform.cache.metadata.resource', ArrayAdapter::class);
+            $container->register('api_platform.cache.route_name_resolver', ArrayAdapter::class);
+            $container->register('api_platform.cache.identifiers_extractor', ArrayAdapter::class);
+            $container->register('api_platform.cache.subresource_operation_factory', ArrayAdapter::class);
+            $container->register('api_platform.elasticsearch.cache.metadata.document', ArrayAdapter::class);
+        }
     }
 
-    /**
-     * Manipulate doctrine services according to the configuration.
-     */
-    private function registerDoctrineConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader, bool $useDoctrine)
+    private function registerDoctrineOrmConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        if (!$useDoctrine) {
+        if (!$this->isConfigEnabled($container, $config['doctrine'])) {
             return;
         }
 
@@ -462,10 +415,12 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             ->addTag('api_platform.doctrine.orm.query_extension.item');
         $container->registerForAutoconfiguration(DoctrineQueryCollectionExtensionInterface::class)
             ->addTag('api_platform.doctrine.orm.query_extension.collection');
+        $container->registerForAutoconfiguration(DoctrineOrmAbstractContextAwareFilter::class)
+            ->setBindings(['$requestStack' => null]);
 
         $loader->load('doctrine_orm.xml');
 
-        if ($config['eager_loading']['enabled']) {
+        if ($this->isConfigEnabled($container, $config['eager_loading'])) {
             return;
         }
 
@@ -475,12 +430,9 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->removeDefinition('api_platform.doctrine.orm.query_extension.filter_eager_loading');
     }
 
-    /**
-     * Register the Doctrine MongoDB ODM configuration.
-     */
-    private function registerDoctrineMongoDbOdmConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerDoctrineMongoDbOdmConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        if (!$config['doctrine_mongodb_odm']['enabled']) {
+        if (!$this->isConfigEnabled($container, $config['doctrine_mongodb_odm'])) {
             return;
         }
 
@@ -488,19 +440,21 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             ->addTag('api_platform.doctrine.mongodb.aggregation_extension.item');
         $container->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)
             ->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection');
+        $container->registerForAutoconfiguration(DoctrineMongoDbOdmAbstractFilter::class)
+            ->setBindings(['$managerRegistry' => new Reference('doctrine_mongodb')]);
 
         $loader->load('doctrine_mongodb_odm.xml');
     }
 
-    private function registerHttpCacheConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader, bool $useDoctrine)
+    private function registerHttpCacheConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
         $loader->load('http_cache.xml');
 
-        if (!$config['http_cache']['invalidation']['enabled']) {
+        if (!$this->isConfigEnabled($container, $config['http_cache']['invalidation'])) {
             return;
         }
 
-        if ($useDoctrine) {
+        if ($this->isConfigEnabled($container, $config['doctrine'])) {
             $loader->load('doctrine_orm_http_cache_purger.xml');
         }
 
@@ -533,11 +487,12 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         return $formats;
     }
 
-    /**
-     * Registers the Validator configuration.
-     */
-    private function registerValidatorConfiguration(ContainerBuilder $container, array $config)
+    private function registerValidatorConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
+        if (interface_exists(ValidatorInterface::class)) {
+            $loader->load('validator.xml');
+        }
+
         if (!$config['validator']) {
             return;
         }
@@ -545,10 +500,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.validator.serialize_payload_fields', $config['validator']['serialize_payload_fields']);
     }
 
-    /**
-     * Registers the DataCollector configuration.
-     */
-    private function registerDataCollectorConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerDataCollectorConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
         if (!$config['enable_profiler']) {
             return;
@@ -561,32 +513,42 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         }
     }
 
-    private function registerMercureConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader, bool $useDoctrine)
+    private function registerMercureConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        if (!$config['mercure']['enabled']) {
+        if (!$this->isConfigEnabled($container, $config['mercure'])) {
             return;
         }
 
         $loader->load('mercure.xml');
         $container->getDefinition('api_platform.mercure.listener.response.add_link_header')->addArgument($config['mercure']['hub_url'] ?? '%mercure.default_hub%');
 
-        if ($useDoctrine) {
+        if ($this->isConfigEnabled($container, $config['doctrine'])) {
             $loader->load('doctrine_orm_mercure_publisher.xml');
+
+            // BC for Symfony Messenger 4.2
+            if (interface_exists(MessageBusInterface::class) && !class_exists(HandlerFailedException::class)) {
+                $container->getDefinition('api_platform.doctrine.listener.mercure.publish')->replaceArgument(5, new Reference('message_bus', ContainerInterface::IGNORE_ON_INVALID_REFERENCE));
+            }
         }
     }
 
-    private function registerMessengerConfiguration(array $config, XmlFileLoader $loader)
+    private function registerMessengerConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        if (!$config['messenger']['enabled']) {
+        if (!$this->isConfigEnabled($container, $config['messenger'])) {
             return;
         }
 
         $loader->load('messenger.xml');
+
+        // BC for Symfony Messenger 4.2
+        if (interface_exists(MessageBusInterface::class) && !class_exists(HandlerFailedException::class)) {
+            $container->setAlias('api_platform.message_bus', 'message_bus');
+        }
     }
 
-    private function registerElasticsearchConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader)
+    private function registerElasticsearchConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
-        $enabled = $config['elasticsearch']['enabled'] && class_exists(Client::class);
+        $enabled = $this->isConfigEnabled($container, $config['elasticsearch']);
 
         $container->setParameter('api_platform.elasticsearch.enabled', $enabled);
 
@@ -603,9 +565,22 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.elasticsearch.mapping', $config['elasticsearch']['mapping']);
     }
 
-    private function registerDataTransformerConfiguration(ContainerBuilder $container)
+    private function registerDataTransformerConfiguration(ContainerBuilder $container): void
     {
         $container->registerForAutoconfiguration(DataTransformerInterface::class)
             ->addTag('api_platform.data_transformer');
+    }
+
+    private function registerSecurityConfiguration(ContainerBuilder $container, XmlFileLoader $loader): void
+    {
+        /** @var string[] $bundles */
+        $bundles = $container->getParameter('kernel.bundles');
+
+        if (isset($bundles['SecurityBundle'])) {
+            if (class_exists(ExpressionLanguage::class)) {
+                $loader->load('security_expression_language.xml');
+            }
+            $loader->load('security.xml');
+        }
     }
 }

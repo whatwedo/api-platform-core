@@ -27,10 +27,7 @@ Feature: JSON-LD contexts generation
             "description": "https://schema.org/description",
             "dummy": "Dummy/dummy",
             "dummyBoolean": "Dummy/dummyBoolean",
-            "dummyDate": {
-              "@id": "http://schema.org/DateTime",
-              "@type": "@id"
-            },
+            "dummyDate": "http://schema.org/DateTime",
             "dummyFloat": "Dummy/dummyFloat",
             "dummyPrice": "Dummy/dummyPrice",
             "relatedDummy": {
@@ -44,7 +41,6 @@ Feature: JSON-LD contexts generation
             "jsonData": "Dummy/jsonData",
             "arrayData": "Dummy/arrayData",
             "nameConverted": "Dummy/nameConverted",
-            "id": "Dummy/id",
             "name": "http://schema.org/name",
             "alias": "https://schema.org/alternateName",
             "foo": "Dummy/foo"

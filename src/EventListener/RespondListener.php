@@ -25,7 +25,7 @@ use Symfony\Component\HttpKernel\Event\GetResponseForControllerResultEvent;
  */
 final class RespondListener
 {
-    const METHOD_TO_CODE = [
+    public const METHOD_TO_CODE = [
         'POST' => Response::HTTP_CREATED,
         'DELETE' => Response::HTTP_NO_CONTENT,
     ];
@@ -40,12 +40,18 @@ final class RespondListener
     /**
      * Creates a Response to send to the client according to the requested format.
      */
-    public function onKernelView(GetResponseForControllerResultEvent $event)
+    public function onKernelView(GetResponseForControllerResultEvent $event): void
     {
         $controllerResult = $event->getControllerResult();
         $request = $event->getRequest();
 
-        if ($controllerResult instanceof Response || !(($attributes = RequestAttributesExtractor::extractAttributes($request))['respond'] ?? $request->attributes->getBoolean('_api_respond', false))) {
+        $attributes = RequestAttributesExtractor::extractAttributes($request);
+        if ($controllerResult instanceof Response && ($attributes['respond'] ?? false)) {
+            $event->setResponse($controllerResult);
+
+            return;
+        }
+        if ($controllerResult instanceof Response || !($attributes['respond'] ?? $request->attributes->getBoolean('_api_respond', false))) {
             return;
         }
 

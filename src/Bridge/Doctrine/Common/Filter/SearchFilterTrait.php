@@ -116,9 +116,9 @@ trait SearchFilterTrait
     protected function getIdFromValue(string $value)
     {
         try {
-            if (null !== $item = $this->getIriConverter()->getItemFromIri($value, ['fetch_data' => false])) {
-                return $this->getPropertyAccessor()->getValue($item, 'id');
-            }
+            $item = $this->getIriConverter()->getItemFromIri($value, ['fetch_data' => false]);
+
+            return $this->getPropertyAccessor()->getValue($item, 'id');
         } catch (InvalidArgumentException $e) {
             // Do nothing, return the raw value
         }
@@ -150,6 +150,8 @@ trait SearchFilterTrait
 
     /**
      * When the field should be an integer, check that the given value is a valid one.
+     *
+     * @param mixed|null $type
      */
     protected function hasValidValues(array $values, $type = null): bool
     {

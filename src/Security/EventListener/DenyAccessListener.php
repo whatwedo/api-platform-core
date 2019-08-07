@@ -33,6 +33,9 @@ use Symfony\Component\Security\Core\Role\RoleHierarchyInterface;
 final class DenyAccessListener
 {
     private $resourceMetadataFactory;
+    /**
+     * @var ResourceAccessCheckerInterface
+     */
     private $resourceAccessChecker;
 
     public function __construct(ResourceMetadataFactoryInterface $resourceMetadataFactory, /*ResourceAccessCheckerInterface*/ $resourceAccessCheckerOrExpressionLanguage = null, AuthenticationTrustResolverInterface $authenticationTrustResolver = null, RoleHierarchyInterface $roleHierarchy = null, TokenStorageInterface $tokenStorage = null, AuthorizationCheckerInterface $authorizationChecker = null)
@@ -50,11 +53,9 @@ final class DenyAccessListener
     }
 
     /**
-     * Sets the applicable format to the HttpFoundation Request.
-     *
      * @throws AccessDeniedException
      */
-    public function onKernelRequest(GetResponseEvent $event)
+    public function onKernelRequest(GetResponseEvent $event): void
     {
         $request = $event->getRequest();
         if (!$attributes = RequestAttributesExtractor::extractAttributes($request)) {
@@ -71,6 +72,7 @@ final class DenyAccessListener
 
         $extraVariables = $request->attributes->all();
         $extraVariables['object'] = $request->attributes->get('data');
+        $extraVariables['previous_object'] = $request->attributes->get('previous_data');
         $extraVariables['request'] = $request;
 
         if (!$this->resourceAccessChecker->isGranted($attributes['resource_class'], $isGranted, $extraVariables)) {

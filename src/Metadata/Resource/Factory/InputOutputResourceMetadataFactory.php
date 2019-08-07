@@ -48,6 +48,10 @@ final class InputOutputResourceMetadataFactory implements ResourceMetadataFactor
             $resourceMetadata = $resourceMetadata->withItemOperations($this->getTransformedOperations($itemOperations, $attributes));
         }
 
+        if (null !== $graphQlAttributes = $resourceMetadata->getGraphql()) {
+            $resourceMetadata = $resourceMetadata->withGraphql($this->getTransformedOperations($graphQlAttributes, $attributes));
+        }
+
         return $resourceMetadata->withAttributes($attributes);
     }
 
@@ -60,6 +64,23 @@ final class InputOutputResourceMetadataFactory implements ResourceMetadataFactor
 
             $operation['input'] = isset($operation['input']) ? $this->transformInputOutput($operation['input']) : $resourceAttributes['input'];
             $operation['output'] = isset($operation['output']) ? $this->transformInputOutput($operation['output']) : $resourceAttributes['output'];
+
+            if (
+                isset($operation['input'])
+                && \array_key_exists('class', $operation['input'])
+                && null === $operation['input']['class']
+            ) {
+                $operation['deserialize'] ?? $operation['deserialize'] = false;
+                $operation['validate'] ?? $operation['validate'] = false;
+            }
+
+            if (
+                isset($operation['output'])
+                && \array_key_exists('class', $operation['output'])
+                && null === $operation['output']['class']
+            ) {
+                $operation['status'] ?? $operation['status'] = 204;
+            }
         }
 
         return $operations;

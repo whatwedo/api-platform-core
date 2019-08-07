@@ -69,9 +69,13 @@ final class ItemResolver
 
         $resourceClass = $this->getObjectClass($item);
         $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
-        $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, $item, 'query');
+        $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, [
+            'object' => $item,
+            'previous_object' => clone $item,
+        ], 'query');
 
         $normalizationContext = $resourceMetadata->getGraphqlAttribute('query', 'normalization_context', [], true);
+        $normalizationContext['resource_class'] = $resourceClass;
 
         return $this->normalizer->normalize($item, ItemNormalizer::FORMAT, $normalizationContext + $baseNormalizationContext);
     }

@@ -39,7 +39,7 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
  */
 final class DocumentationNormalizer implements NormalizerInterface, CacheableSupportsMethodInterface
 {
-    const FORMAT = 'jsonld';
+    public const FORMAT = 'jsonld';
 
     private $resourceMetadataFactory;
     private $propertyNameCollectionFactory;
@@ -194,8 +194,10 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
             }
         }
 
+        /** @var string[] $classes */
+        $classes = array_keys($classes);
         $properties = [];
-        foreach ($classes as $class => $v) {
+        foreach ($classes as $class) {
             foreach ($this->propertyNameCollectionFactory->create($class, $this->getPropertyNameCollectionFactoryContext($resourceMetadata)) as $propertyName) {
                 $propertyMetadata = $this->propertyMetadataFactory->create($class, $propertyName);
                 if (true === $propertyMetadata->isIdentifier() && false === $propertyMetadata->isWritable()) {
@@ -324,10 +326,8 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
 
     /**
      * Gets the range of the property.
-     *
-     * @return string|null
      */
-    private function getRange(PropertyMetadata $propertyMetadata)
+    private function getRange(PropertyMetadata $propertyMetadata): ?string
     {
         $jsonldContext = $propertyMetadata->getAttributes()['jsonld_context'] ?? [];
 
@@ -461,7 +461,7 @@ final class DocumentationNormalizer implements NormalizerInterface, CacheableSup
     {
         $propertyData = [
             '@id' => $propertyMetadata->getIri() ?? "#$shortName/$propertyName",
-            '@type' => $propertyMetadata->isReadableLink() ? 'rdf:Property' : 'hydra:Link',
+            '@type' => false === $propertyMetadata->isReadableLink() ? 'hydra:Link' : 'rdf:Property',
             'rdfs:label' => $propertyName,
             'domain' => $prefixedShortName,
         ];
