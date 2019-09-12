@@ -61,12 +61,6 @@ final class TypeBuilder implements TypeBuilderInterface
             }
             $shortName .= 'Payload';
         }
-        if ('item_query' === $queryName) {
-            $shortName .= 'Item';
-        }
-        if ('collection_query' === $queryName) {
-            $shortName .= 'Collection';
-        }
         if ($wrapped && null !== $mutationName) {
             $shortName .= 'Data';
         }
