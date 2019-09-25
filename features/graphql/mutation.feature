@@ -1,4 +1,5 @@
 Feature: GraphQL mutation support
+
   @createSchema
   Scenario: Introspect types
     When I send the following GraphQL request:
@@ -17,6 +18,10 @@ Feature: GraphQL mutation support
             type {
               name
               kind
+              ofType {
+                name
+                kind
+              }
             }
           }
         }
@@ -26,13 +31,14 @@ Feature: GraphQL mutation support
     Then the response status code should be 200
     And the response should be in JSON
     And the header "Content-Type" should be equal to "application/json"
-    And the JSON node "data.__type.fields[0].name" should contain "delete"
-    And the JSON node "data.__type.fields[0].description" should match '/^Deletes a [A-z0-9]+.$/'
-    And the JSON node "data.__type.fields[0].type.name" should match "/^delete[A-z0-9]+Payload$/"
-    And the JSON node "data.__type.fields[0].type.kind" should be equal to "OBJECT"
-    And the JSON node "data.__type.fields[0].args[0].name" should be equal to "input"
-    And the JSON node "data.__type.fields[0].args[0].type.name" should match "/^delete[A-z0-9]+Input$/"
-    And the JSON node "data.__type.fields[0].args[0].type.kind" should be equal to "INPUT_OBJECT"
+    And the JSON node "data.__type.fields[2].name" should contain "delete"
+    And the JSON node "data.__type.fields[2].description" should match '/^Deletes a [A-z0-9]+.$/'
+    And the JSON node "data.__type.fields[2].type.name" should match "/^delete[A-z0-9]+Payload$/"
+    And the JSON node "data.__type.fields[2].type.kind" should be equal to "OBJECT"
+    And the JSON node "data.__type.fields[2].args[0].name" should be equal to "input"
+    And the JSON node "data.__type.fields[2].args[0].type.kind" should be equal to "NON_NULL"
+    And the JSON node "data.__type.fields[2].args[0].type.ofType.name" should match "/^delete[A-z0-9]+Input$/"
+    And the JSON node "data.__type.fields[2].args[0].type.ofType.kind" should be equal to "INPUT_OBJECT"
 
   Scenario: Create an item
     When I send the following GraphQL request:
@@ -55,7 +61,7 @@ Feature: GraphQL mutation support
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.createFoo.foo.id" should be equal to "/foos/1"
     And the JSON node "data.createFoo.foo._id" should be equal to 1
-    And the JSON node "data.createFoo.foo.__typename" should be equal to "Foo"
+    And the JSON node "data.createFoo.foo.__typename" should be equal to "FooItem"
     And the JSON node "data.createFoo.foo.name" should be equal to "A new one"
     And the JSON node "data.createFoo.foo.bar" should be equal to "new"
     And the JSON node "data.createFoo.clientMutationId" should be equal to "myId"
@@ -85,7 +91,7 @@ Feature: GraphQL mutation support
     When I send the following GraphQL request:
     """
     mutation {
-      createDummy(input: {name: "A dummy", foo: [], relatedDummy: "/related_dummies/1", clientMutationId: "myId"}) {
+      createDummy(input: {name: "A dummy", foo: [], relatedDummy: "/related_dummies/1", name_converted: "Converted" clientMutationId: "myId"}) {
         dummy {
           id
           name
@@ -94,6 +100,7 @@ Feature: GraphQL mutation support
             name
             __typename
           }
+          name_converted
         }
         clientMutationId
       }
@@ -106,7 +113,8 @@ Feature: GraphQL mutation support
     And the JSON node "data.createDummy.dummy.name" should be equal to "A dummy"
     And the JSON node "data.createDummy.dummy.foo" should have 0 elements
     And the JSON node "data.createDummy.dummy.relatedDummy.name" should be equal to "RelatedDummy #1"
-    And the JSON node "data.createDummy.dummy.relatedDummy.__typename" should be equal to "RelatedDummy"
+    And the JSON node "data.createDummy.dummy.relatedDummy.__typename" should be equal to "RelatedDummyItem"
+    And the JSON node "data.createDummy.dummy.name_converted" should be equal to "Converted"
     And the JSON node "data.createDummy.clientMutationId" should be equal to "myId"
 
   Scenario: Create an item with an iterable field
@@ -199,7 +207,7 @@ Feature: GraphQL mutation support
     When I send the following GraphQL request:
     """
     mutation {
-      updateDummy(input: {id: "/dummies/1", description: "Modified description.", dummyDate: "2018-06-05", clientMutationId: "myId"}) {
+      updateDummy(input: {id: "/dummies/1", description: "Modified description.", dummyDate: "2018-06-05T00:00:00+00:00", clientMutationId: "myId"}) {
         dummy {
           id
           name
@@ -223,7 +231,7 @@ Feature: GraphQL mutation support
     And the JSON node "data.updateDummy.dummy.id" should be equal to "/dummies/1"
     And the JSON node "data.updateDummy.dummy.name" should be equal to "Dummy #1"
     And the JSON node "data.updateDummy.dummy.description" should be equal to "Modified description."
-    And the JSON node "data.updateDummy.dummy.dummyDate" should be equal to "2018-06-05T00:00:00+00:00"
+    And the JSON node "data.updateDummy.dummy.dummyDate" should be equal to "2018-06-05"
     And the JSON node "data.updateDummy.dummy.relatedDummies.edges[0].node.name" should be equal to "RelatedDummy11"
     And the JSON node "data.updateDummy.clientMutationId" should be equal to "myId"
 
@@ -319,7 +327,7 @@ Feature: GraphQL mutation support
     When I send the following GraphQL request:
     """
     mutation {
-      createDummy(input: {_id: 12, name: "", foo: [], clientMutationId: "myId"}) {
+      createDummy(input: {name: "", foo: [], clientMutationId: "myId"}) {
         clientMutationId
       }
     }
@@ -329,93 +337,82 @@ Feature: GraphQL mutation support
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "errors[0].message" should be equal to "name: This value should not be blank."
 
-  Scenario: Create an item using custom inputClass & disabled outputClass
-    Given there are 2 dummyDtoNoOutput objects
+  Scenario: Execute a custom mutation
+    Given there are 1 dummyCustomMutation objects
     When I send the following GraphQL request:
     """
     mutation {
-      createDummyDtoNoOutput(input: {foo: "A new one", bar: 3, clientMutationId: "myId"}) {
-        dummyDtoNoOutput {
+      sumDummyCustomMutation(input: {id: "/dummy_custom_mutations/1", operandB: 5}) {
+        dummyCustomMutation {
           id
+          result
         }
-        clientMutationId
       }
     }
     """
     Then the response status code should be 200
     And the response should be in JSON
     And the header "Content-Type" should be equal to "application/json"
-    And the JSON should be equal to:
-    """
-    {
-      "errors": [
-        {
-          "message": "Cannot query field \"id\" on type \"DummyDtoNoOutput\".",
-          "extensions": {
-            "category": "graphql"
-          },
-          "locations": [
-            {
-              "line": 4,
-              "column": 7
-            }
-          ]
-        }
-      ]
-    }
-    """
+    And the JSON node "data.sumDummyCustomMutation.dummyCustomMutation.result" should be equal to "8"
 
-  Scenario: Cannot create an item with input fields using disabled inputClass
+  Scenario: Execute a not persisted custom mutation (resolver returns null)
     When I send the following GraphQL request:
     """
     mutation {
-      createDummyDtoNoInput(input: {lorem: "A new one", ipsum: 3, clientMutationId: "myId"}) {
-        clientMutationId
-      }
-    }
-    """
-    Then the response status code should be 200
-    And the response should be in JSON
-    And the header "Content-Type" should be equal to "application/json"
-    And the JSON should be equal to:
-    """
-    {
-      "errors": [
-        {
-          "message": "Field \"lorem\" is not defined by type createDummyDtoNoInputInput.",
-          "extensions": {
-            "category": "graphql"
-          },
-          "locations": [
-            {
-              "line": 2,
-              "column": 33
-            }
-          ]
-        },
-        {
-          "message": "Field \"ipsum\" is not defined by type createDummyDtoNoInputInput.",
-          "extensions": {
-            "category": "graphql"
-          },
-          "locations": [
-            {
-              "line": 2,
-              "column": 53
-            }
-          ]
-        }
-      ]
-    }
-    """
-
-  Scenario: Create an item with empty input fields using disabled inputClass (no persist done)
-    When I send the following GraphQL request:
-    """
-    mutation {
-      createDummyDtoNoInput(input: {clientMutationId: "myId"}) {
-        dummyDtoNoInput {
+      sumNotPersistedDummyCustomMutation(input: {id: "/dummy_custom_mutations/1", operandB: 5}) {
+        dummyCustomMutation {
           id
+          result
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.sumNotPersistedDummyCustomMutation.dummyCustomMutation" should be null
+
+  Scenario: Execute a not persisted custom mutation (write set to false) with custom result
+    When I send the following GraphQL request:
+    """
+    mutation {
+      sumNoWriteCustomResultDummyCustomMutation(input: {id: "/dummy_custom_mutations/1", operandB: 5}) {
+        dummyCustomMutation {
+          id
+          result
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.sumNoWriteCustomResultDummyCustomMutation.dummyCustomMutation.result" should be equal to "1234"
+
+  Scenario: Execute a custom mutation with read, deserialize, validate and serialize set to false
+    When I send the following GraphQL request:
+    """
+    mutation {
+      sumOnlyPersistDummyCustomMutation(input: {id: "/dummy_custom_mutations/1", operandB: 5}) {
+        dummyCustomMutation {
+          id
+          result
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.sumOnlyPersistDummyCustomMutation.dummyCustomMutation" should be null
+
+  Scenario: Execute a custom mutation with custom arguments
+    When I send the following GraphQL request:
+    """
+    mutation {
+      testCustomArgumentsDummyCustomMutation(input: {operandC: 18, clientMutationId: "myId"}) {
+        dummyCustomMutation {
+          result
         }
         clientMutationId
       }
@@ -424,14 +421,58 @@ Feature: GraphQL mutation support
     Then the response status code should be 200
     And the response should be in JSON
     And the header "Content-Type" should be equal to "application/json"
-    And the JSON should be equal to:
+    And the JSON node "data.testCustomArgumentsDummyCustomMutation.dummyCustomMutation.result" should be equal to "18"
+    And the JSON node "data.testCustomArgumentsDummyCustomMutation.clientMutationId" should be equal to "myId"
+
+  Scenario: Uploading a file with a custom mutation
+    Given I have the following file for a GraphQL request:
+      | name | file     |
+      | file | test.gif |
+    And I have the following GraphQL multipart request map:
     """
     {
-      "data": {
-        "createDummyDtoNoInput": {
-          "dummyDtoNoInput": null,
-          "clientMutationId": "myId"
-        }
-      }
+      "file": ["variables.file"]
     }
     """
+    When I send the following GraphQL multipart request operations:
+    """
+      {
+        "query": "mutation($file: Upload!) { uploadMediaObject(input: {file: $file}) { mediaObject { id contentUrl } } }",
+        "variables": {
+          "file": null
+        }
+      }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the JSON node "data.uploadMediaObject.mediaObject.contentUrl" should be equal to "test.gif"
+
+  Scenario: Uploading multiple files with a custom mutation
+    Given I have the following files for a GraphQL request:
+      | name | file     |
+      | 0    | test.gif |
+      | 1    | test.gif |
+      | 2    | test.gif |
+    And I have the following GraphQL multipart request map:
+    """
+    {
+      "0": ["variables.files.0"],
+      "1": ["variables.files.1"],
+      "2": ["variables.files.2"]
+    }
+    """
+    When I send the following GraphQL multipart request operations:
+    """
+      {
+        "query": "mutation($files: [Upload!]!) { uploadMultipleMediaObject(input: {files: $files}) { mediaObject { id contentUrl } } }",
+        "variables": {
+          "files": [
+            null,
+            null,
+            null
+          ]
+        }
+      }
+    """
+    Then the response status code should be 200
+    And the JSON node "data.uploadMultipleMediaObject.mediaObject.contentUrl" should be equal to "test.gif"

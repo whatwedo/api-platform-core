@@ -76,6 +76,8 @@ class SwaggerUiActionTest extends TestCase
             'swaggerUiEnabled' => false,
             'reDocEnabled' => false,
             'graphqlEnabled' => false,
+            'graphiQlEnabled' => false,
+            'graphQlPlaygroundEnabled' => false,
             'swagger_data' => [
                 'url' => '/url',
                 'spec' => self::SPEC,
@@ -107,6 +109,8 @@ class SwaggerUiActionTest extends TestCase
             'showWebby' => true,
             'reDocEnabled' => false,
             'graphqlEnabled' => false,
+            'graphiQlEnabled' => false,
+            'graphQlPlaygroundEnabled' => false,
             'swagger_data' => [
                 'url' => '/url',
                 'spec' => self::SPEC,
@@ -145,6 +149,7 @@ class SwaggerUiActionTest extends TestCase
         $resourceNameCollectionFactoryProphecy->create()->willReturn(new ResourceNameCollection(['Foo', 'Bar']))->shouldBeCalled();
 
         $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata());
 
         $normalizerProphecy = $this->prophesize(NormalizerInterface::class);
         $normalizerProphecy->normalize(Argument::type(Documentation::class), 'json', Argument::type('array'))->willReturn(self::SPEC)->shouldBeCalled();
@@ -158,6 +163,8 @@ class SwaggerUiActionTest extends TestCase
             'swaggerUiEnabled' => false,
             'reDocEnabled' => false,
             'graphqlEnabled' => false,
+            'graphiQlEnabled' => false,
+            'graphQlPlaygroundEnabled' => false,
             'swagger_data' => [
                 'url' => '/url',
                 'spec' => self::SPEC,
@@ -187,14 +194,11 @@ class SwaggerUiActionTest extends TestCase
         $action($request);
     }
 
-    public function getDoNotRunCurrentRequestParameters()
+    public function getDoNotRunCurrentRequestParameters(): iterable
     {
         $nonSafeRequest = new Request([], [], ['_api_resource_class' => 'Foo', '_api_collection_operation_name' => 'post']);
         $nonSafeRequest->setMethod('POST');
-
-        return [
-            [$nonSafeRequest],
-            [new Request()],
-        ];
+        yield [$nonSafeRequest];
+        yield [new Request()];
     }
 }

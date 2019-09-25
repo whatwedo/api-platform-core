@@ -23,6 +23,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 
 /**
  * {@inheritdoc}
@@ -41,11 +42,9 @@ abstract class AbstractFilter implements FilterInterface
     protected $requestStack;
     protected $logger;
     protected $properties;
+    protected $nameConverter;
 
-    /**
-     * @param RequestStack|null $requestStack No prefix to prevent autowiring of this deprecated property
-     */
-    public function __construct(ManagerRegistry $managerRegistry, $requestStack = null, LoggerInterface $logger = null, array $properties = null)
+    public function __construct(ManagerRegistry $managerRegistry, ?RequestStack $requestStack = null, LoggerInterface $logger = null, array $properties = null, NameConverterInterface $nameConverter = null)
     {
         if (null !== $requestStack) {
             @trigger_error(sprintf('Passing an instance of "%s" is deprecated since 2.2. Use "filters" context key instead.', RequestStack::class), E_USER_DEPRECATED);
@@ -55,6 +54,7 @@ abstract class AbstractFilter implements FilterInterface
         $this->requestStack = $requestStack;
         $this->logger = $logger ?? new NullLogger();
         $this->properties = $properties;
+        $this->nameConverter = $nameConverter;
     }
 
     /**
@@ -140,5 +140,23 @@ abstract class AbstractFilter implements FilterInterface
         }
 
         return $request->query->all();
+    }
+
+    protected function denormalizePropertyName($property)
+    {
+        if (!$this->nameConverter instanceof NameConverterInterface) {
+            return $property;
+        }
+
+        return implode('.', array_map([$this->nameConverter, 'denormalize'], explode('.', $property)));
+    }
+
+    protected function normalizePropertyName($property)
+    {
+        if (!$this->nameConverter instanceof NameConverterInterface) {
+            return $property;
+        }
+
+        return implode('.', array_map([$this->nameConverter, 'normalize'], explode('.', $property)));
     }
 }

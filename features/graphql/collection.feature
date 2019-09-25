@@ -9,7 +9,7 @@ Feature: GraphQL collection support
         ...dummyFields
       }
     }
-    fragment dummyFields on DummyConnection {
+    fragment dummyFields on DummyCollectionConnection {
       edges {
         node {
           id
@@ -44,8 +44,10 @@ Feature: GraphQL collection support
           }
         }
         pageInfo {
+          startCursor
           endCursor
           hasNextPage
+          hasPreviousPage
         }
       }
     }
@@ -55,7 +57,9 @@ Feature: GraphQL collection support
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.dummies.edges" should have 0 element
     And the JSON node "data.dummies.pageInfo.endCursor" should be null
+    And the JSON node "data.dummies.pageInfo.startCursor" should be null
     And the JSON node "data.dummies.pageInfo.hasNextPage" should be false
+    And the JSON node "data.dummies.pageInfo.hasPreviousPage" should be false
 
   @createSchema
   Scenario: Retrieve a collection with a nested collection through a GraphQL query
@@ -109,7 +113,7 @@ Feature: GraphQL collection support
     And the response should be in JSON
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.dummies.edges[1].node.name" should be equal to "Dummy #2"
-    And the JSON node "data.dummies.edges[1].node.dummyDate" should be equal to "2015-04-02T00:00:00+00:00"
+    And the JSON node "data.dummies.edges[1].node.dummyDate" should be equal to "2015-04-02"
     And the JSON node "data.dummyGroup.foo" should be equal to "Foo #2"
 
   @createSchema
@@ -319,6 +323,286 @@ Feature: GraphQL collection support
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.dummies.edges" should have 0 element
 
+  @createSchema
+  Scenario: Paginate backwards through collections through a GraphQL query
+    Given there are 4 dummy objects having each 4 relatedDummies
+    When I send the following GraphQL request:
+    """
+    {
+      dummies(last: 2) {
+        edges {
+          node {
+            name
+            relatedDummies(last: 2) {
+              edges {
+                node {
+                  name
+                }
+                cursor
+              }
+              totalCount
+              pageInfo {
+                startCursor
+                hasPreviousPage
+              }
+            }
+          }
+          cursor
+        }
+        totalCount
+        pageInfo {
+          startCursor
+          hasPreviousPage
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.dummies.pageInfo.startCursor" should be equal to "Mg=="
+    And the JSON node "data.dummies.pageInfo.hasPreviousPage" should be true
+    And the JSON node "data.dummies.totalCount" should be equal to 4
+    And the JSON node "data.dummies.edges[1].node.name" should be equal to "Dummy #4"
+    And the JSON node "data.dummies.edges[1].cursor" should be equal to "Mw=="
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.pageInfo.startCursor" should be equal to "Mg=="
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.pageInfo.hasPreviousPage" should be true
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.totalCount" should be equal to 4
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.edges[0].node.name" should be equal to "RelatedDummy34"
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.edges[0].cursor" should be equal to "Mg=="
+    When I send the following GraphQL request:
+    """
+    {
+      dummies(last: 2, before: "Mw==") {
+        edges {
+          node {
+            name
+            relatedDummies(last: 2, before: "Mg==") {
+              edges {
+                node {
+                  name
+                }
+                cursor
+              }
+              pageInfo {
+                startCursor
+                hasPreviousPage
+              }
+            }
+          }
+          cursor
+        }
+        pageInfo {
+          startCursor
+          hasPreviousPage
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.dummies.edges[0].node.name" should be equal to "Dummy #2"
+    And the JSON node "data.dummies.edges[0].cursor" should be equal to "MQ=="
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.edges[0].node.name" should be equal to "RelatedDummy13"
+    And the JSON node "data.dummies.edges[1].node.relatedDummies.edges[0].cursor" should be equal to "MA=="
+    When I send the following GraphQL request:
+    """
+    {
+      dummies(last: 2, before: "MQ==") {
+        edges {
+          node {
+            name
+            relatedDummies(last: 3, before: "Mg==") {
+              edges {
+                node {
+                  name
+                }
+                cursor
+              }
+              pageInfo {
+                startCursor
+                hasPreviousPage
+              }
+            }
+          }
+          cursor
+        }
+        pageInfo {
+          startCursor
+          hasPreviousPage
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.dummies.edges" should have 1 element
+    And the JSON node "data.dummies.pageInfo.hasPreviousPage" should be false
+    And the JSON node "data.dummies.pageInfo.startCursor" should be equal to "MA=="
+    And the JSON node "data.dummies.edges[0].node.name" should be equal to "Dummy #1"
+    And the JSON node "data.dummies.edges[0].cursor" should be equal to "MA=="
+    And the JSON node "data.dummies.edges[0].node.relatedDummies.pageInfo.hasPreviousPage" should be false
+    And the JSON node "data.dummies.edges[0].node.relatedDummies.pageInfo.startCursor" should be equal to "MA=="
+    And the JSON node "data.dummies.edges[0].node.relatedDummies.edges" should have 2 elements
+    And the JSON node "data.dummies.edges[0].node.relatedDummies.edges[1].node.name" should be equal to "RelatedDummy21"
+    And the JSON node "data.dummies.edges[0].node.relatedDummies.edges[1].cursor" should be equal to "MQ=="
+    When I send the following GraphQL request:
+    """
+    {
+      dummies(last: 2, before: "MA==") {
+        edges {
+          node {
+            name
+            relatedDummies(last: 1, before: "MQ==") {
+              edges {
+                node {
+                  name
+                }
+                cursor
+              }
+              pageInfo {
+                startCursor
+                hasPreviousPage
+              }
+            }
+          }
+          cursor
+        }
+        pageInfo {
+          startCursor
+          hasPreviousPage
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.dummies.edges" should have 0 element
+
+  @createSchema
+  Scenario: Retrieve a collection with pagination disabled
+    Given there are 4 foo objects with fake names
+    When I send the following GraphQL request:
+    """
+    {
+      foos {
+        id
+        name
+        bar
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.foos[3].id" should be equal to "/foos/4"
+    And the JSON node "data.foos[3].name" should be equal to "Separativeness"
+    And the JSON node "data.foos[3].bar" should be equal to "Sit"
+
+  Scenario: Custom collection query
+    Given there are 2 dummyCustomQuery objects
+    When I send the following GraphQL request:
+    """
+    {
+      testCollectionDummyCustomQueries {
+        edges {
+          node {
+            message
+          }
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testCollectionDummyCustomQueries": {
+          "edges": [
+            {
+              "node": {"message": "Success!"}
+            },
+            {
+              "node": {"message": "Success!"}
+            }
+          ]
+        }
+      }
+    }
+    """
+
+  @createSchema
+  Scenario: Custom collection query with read and serialize set to false
+    Given there are 2 dummyCustomQuery objects
+    When I send the following GraphQL request:
+    """
+    {
+      testCollectionNoReadAndSerializeDummyCustomQueries {
+        edges {
+          node {
+            message
+          }
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testCollectionNoReadAndSerializeDummyCustomQueries": {
+          "edges": []
+        }
+      }
+    }
+    """
+
+  @createSchema
+  Scenario: Custom collection query with custom arguments
+    Given there are 2 dummyCustomQuery objects
+    When I send the following GraphQL request:
+    """
+    {
+      testCollectionCustomArgumentsDummyCustomQueries(customArgumentString: "A string") {
+        edges {
+          node {
+            message
+            customArgs
+          }
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testCollectionCustomArgumentsDummyCustomQueries": {
+          "edges": [
+            {
+              "node": {"message": "Success!", "customArgs": {"customArgumentString": "A string"}}
+            },
+            {
+              "node": {"message": "Success!", "customArgs": {"customArgumentString": "A string"}}
+            }
+          ]
+        }
+      }
+    }
+    """
+
   @!mongodb
   @createSchema
   Scenario: Retrieve an item with composite primitive identifiers through a GraphQL query
@@ -352,3 +636,23 @@ Feature: GraphQL collection support
     And the response should be in JSON
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.compositeRelation.value" should be equal to "somefoobardummy"
+
+  @createSchema
+  Scenario: Retrieve a collection using name converter
+    Given there are 4 dummy objects
+    When I send the following GraphQL request:
+    """
+    {
+      dummies {
+        edges {
+          node {
+            name_converted
+          }
+        }
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON node "data.dummies.edges[1].node.name_converted" should be equal to "Converted 2"

@@ -27,9 +27,11 @@ class ApiResourceTest extends TestCase
     public function testConstruct()
     {
         $resource = new ApiResource([
-            'accessControl' => 'has_role("ROLE_FOO")',
-            'accessControlMessage' => 'You are not foo.',
-            'attributes' => ['foo' => 'bar', 'validation_groups' => ['baz', 'qux'], 'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0]],
+            'security' => 'is_granted("ROLE_FOO")',
+            'securityMessage' => 'You are not foo.',
+            'securityPostDenormalize' => 'is_granted("ROLE_BAR")',
+            'securityPostDenormalizeMessage' => 'You are not bar.',
+            'attributes' => ['foo' => 'bar', 'validation_groups' => ['baz', 'qux'], 'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0, 'vary' => ['Custom-Vary-1', 'Custom-Vary-2']]],
             'collectionOperations' => ['bar' => ['foo']],
             'denormalizationContext' => ['groups' => ['foo']],
             'description' => 'description',
@@ -41,7 +43,6 @@ class ApiResourceTest extends TestCase
             'input' => 'Foo',
             'iri' => 'http://example.com/res',
             'itemOperations' => ['foo' => ['bar']],
-            'maximumItemsPerPage' => 42,
             'mercure' => '[\'foo\', object.owner]',
             'messenger' => true,
             'normalizationContext' => ['groups' => ['bar']],
@@ -54,6 +55,8 @@ class ApiResourceTest extends TestCase
             'paginationEnabled' => true,
             'paginationFetchJoinCollection' => true,
             'paginationItemsPerPage' => 42,
+            'maximumItemsPerPage' => 42, // deprecated, see paginationMaximumItemsPerPage
+            'paginationMaximumItemsPerPage' => 50,
             'paginationPartial' => true,
             'routePrefix' => '/foo',
             'shortName' => 'shortName',
@@ -71,8 +74,10 @@ class ApiResourceTest extends TestCase
         $this->assertSame([], $resource->subresourceOperations);
         $this->assertSame(['query' => ['normalization_context' => ['groups' => ['foo', 'bar']]]], $resource->graphql);
         $this->assertEquals([
-            'access_control' => 'has_role("ROLE_FOO")',
-            'access_control_message' => 'You are not foo.',
+            'security' => 'is_granted("ROLE_FOO")',
+            'security_message' => 'You are not foo.',
+            'security_post_denormalize' => 'is_granted("ROLE_BAR")',
+            'security_post_denormalize_message' => 'You are not bar.',
             'denormalization_context' => ['groups' => ['foo']],
             'fetch_partial' => true,
             'foo' => 'bar',
@@ -80,7 +85,6 @@ class ApiResourceTest extends TestCase
             'formats' => ['foo', 'bar' => ['application/bar']],
             'filters' => ['foo', 'bar'],
             'input' => 'Foo',
-            'maximum_items_per_page' => 42,
             'mercure' => '[\'foo\', object.owner]',
             'messenger' => true,
             'normalization_context' => ['groups' => ['bar']],
@@ -93,11 +97,13 @@ class ApiResourceTest extends TestCase
             'pagination_enabled' => true,
             'pagination_fetch_join_collection' => true,
             'pagination_items_per_page' => 42,
+            'maximum_items_per_page' => 42,
+            'pagination_maximum_items_per_page' => 50,
             'pagination_partial' => true,
             'route_prefix' => '/foo',
             'swagger_context' => ['description' => 'bar'],
             'validation_groups' => ['baz', 'qux'],
-            'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0],
+            'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0, 'vary' => ['Custom-Vary-1', 'Custom-Vary-2']],
             'sunset' => 'Thu, 11 Oct 2018 00:00:00 +0200',
         ], $resource->attributes);
     }
@@ -118,9 +124,11 @@ class ApiResourceTest extends TestCase
         $this->assertEquals([
             'foo' => 'bar',
             'route_prefix' => '/whatever',
-            'access_control' => "has_role('ROLE_FOO')",
-            'access_control_message' => 'You are not foo.',
-            'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0],
+            'security' => "is_granted('ROLE_FOO')",
+            'security_message' => 'You are not foo.',
+            'security_post_denormalize' => "is_granted('ROLE_BAR')",
+            'security_post_denormalize_message' => 'You are not bar.',
+            'cache_headers' => ['max_age' => 0, 'shared_max_age' => 0, 'vary' => ['Custom-Vary-1', 'Custom-Vary-2']],
         ], $resource->attributes);
     }
 

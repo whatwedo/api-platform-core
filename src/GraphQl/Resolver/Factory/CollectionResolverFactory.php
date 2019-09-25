@@ -13,19 +13,16 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\GraphQl\Resolver\Factory;
 
-use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
-use ApiPlatform\Core\DataProvider\PaginatorInterface;
-use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
-use ApiPlatform\Core\Exception\ResourceClassNotSupportedException;
-use ApiPlatform\Core\GraphQl\Resolver\FieldsToAttributesTrait;
-use ApiPlatform\Core\GraphQl\Resolver\ResourceAccessCheckerTrait;
-use ApiPlatform\Core\GraphQl\Serializer\ItemNormalizer;
+use ApiPlatform\Core\GraphQl\Resolver\QueryCollectionResolverInterface;
+use ApiPlatform\Core\GraphQl\Resolver\Stage\ReadStageInterface;
+use ApiPlatform\Core\GraphQl\Resolver\Stage\SecurityPostDenormalizeStageInterface;
+use ApiPlatform\Core\GraphQl\Resolver\Stage\SecurityStageInterface;
+use ApiPlatform\Core\GraphQl\Resolver\Stage\SerializeStageInterface;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
-use ApiPlatform\Core\Security\ResourceAccessCheckerInterface;
-use GraphQL\Error\Error;
+use ApiPlatform\Core\Util\CloneTrait;
 use GraphQL\Type\Definition\ResolveInfo;
+use Psr\Container\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 /**
  * Creates a function retrieving a collection to resolve a GraphQL query or a field returned by a mutation.
@@ -34,35 +31,35 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
  *
  * @author Alan Poulain <contact@alanpoulain.eu>
  * @author Kévin Dunglas <dunglas@gmail.com>
+ * @author Vincent Chalamon <vincentchalamon@gmail.com>
  */
 final class CollectionResolverFactory implements ResolverFactoryInterface
 {
-    use FieldsToAttributesTrait;
-    use ResourceAccessCheckerTrait;
+    use CloneTrait;
 
-    private $collectionDataProvider;
-    private $subresourceDataProvider;
-    private $normalizer;
-    private $resourceAccessChecker;
+    private $readStage;
+    private $securityStage;
+    private $securityPostDenormalizeStage;
+    private $serializeStage;
+    private $queryResolverLocator;
     private $requestStack;
-    private $paginationEnabled;
     private $resourceMetadataFactory;
 
-    public function __construct(CollectionDataProviderInterface $collectionDataProvider, SubresourceDataProviderInterface $subresourceDataProvider, NormalizerInterface $normalizer, ResourceMetadataFactoryInterface $resourceMetadataFactory, ResourceAccessCheckerInterface $resourceAccessChecker = null, RequestStack $requestStack = null, bool $paginationEnabled = false)
+    public function __construct(ReadStageInterface $readStage, SecurityStageInterface $securityStage, SecurityPostDenormalizeStageInterface $securityPostDenormalizeStage, SerializeStageInterface $serializeStage, ContainerInterface $queryResolverLocator, ResourceMetadataFactoryInterface $resourceMetadataFactory, RequestStack $requestStack = null)
     {
-        $this->subresourceDataProvider = $subresourceDataProvider;
-        $this->collectionDataProvider = $collectionDataProvider;
-        $this->normalizer = $normalizer;
-        $this->resourceAccessChecker = $resourceAccessChecker;
+        $this->readStage = $readStage;
+        $this->securityStage = $securityStage;
+        $this->securityPostDenormalizeStage = $securityPostDenormalizeStage;
+        $this->serializeStage = $serializeStage;
+        $this->queryResolverLocator = $queryResolverLocator;
         $this->requestStack = $requestStack;
-        $this->paginationEnabled = $paginationEnabled;
         $this->resourceMetadataFactory = $resourceMetadataFactory;
     }
 
-    public function __invoke(string $resourceClass = null, string $rootClass = null, string $operationName = null): callable
+    public function __invoke(?string $resourceClass = null, ?string $rootClass = null, ?string $operationName = null): callable
     {
-        return function ($source, $args, $context, ResolveInfo $info) use ($resourceClass, $rootClass, $operationName) {
-            if (null === $resourceClass) {
+        return function (?array $source, array $args, $context, ResolveInfo $info) use ($resourceClass, $rootClass, $operationName) {
+            if (null === $resourceClass || null === $rootClass) {
                 return null;
             }
 
@@ -73,102 +70,36 @@ final class CollectionResolverFactory implements ResolverFactoryInterface
                 );
             }
 
+            $operationName = $operationName ?? 'collection_query';
+            $resolverContext = ['source' => $source, 'args' => $args, 'info' => $info, 'is_collection' => true, 'is_mutation' => false];
+
+            $collection = ($this->readStage)($resourceClass, $rootClass, $operationName, $resolverContext);
+            if (!is_iterable($collection)) {
+                throw new \LogicException('Collection from read stage should be iterable.');
+            }
+
             $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
-            $dataProviderContext = $resourceMetadata->getGraphqlAttribute($operationName ?? 'query', 'normalization_context', [], true);
-            $dataProviderContext['attributes'] = $this->fieldsToAttributes($info);
-            $dataProviderContext['filters'] = $this->getNormalizedFilters($args);
-            $dataProviderContext['graphql'] = true;
 
-            if (isset($rootClass, $source[$rootProperty = $info->fieldName], $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY])) {
-                $rootResolvedFields = $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY];
-	            $collection = $this->getSubresource($rootClass, $rootResolvedFields, array_keys($rootResolvedFields), $rootProperty, $resourceClass, true, $dataProviderContext);
-            } else {
-	            $collection = $this->collectionDataProvider->getCollection($resourceClass, null, $dataProviderContext);
+            $queryResolverId = $resourceMetadata->getGraphqlAttribute($operationName, 'collection_query');
+            if (null !== $queryResolverId) {
+                /** @var QueryCollectionResolverInterface $queryResolver */
+                $queryResolver = $this->queryResolverLocator->get($queryResolverId);
+                $collection = $queryResolver($collection, $resolverContext);
             }
 
-	        $collection = empty($collection) ? $source[$rootProperty] ?? [] : $collection;
+            ($this->securityStage)($resourceClass, $operationName, $resolverContext + [
+                'extra_variables' => [
+                    'object' => $collection,
+                ],
+            ]);
+            ($this->securityPostDenormalizeStage)($resourceClass, $operationName, $resolverContext + [
+                'extra_variables' => [
+                    'object' => $collection,
+                    'previous_object' => $this->clone($collection),
+                ],
+            ]);
 
-            $this->canAccess($this->resourceAccessChecker, $resourceMetadata, $resourceClass, $info, $collection, $operationName ?? 'query');
-
-            if (!$this->paginationEnabled) {
-                $data = [];
-                foreach ($collection as $index => $object) {
-                    $data[$index] = $this->normalizer->normalize($object, ItemNormalizer::FORMAT, $dataProviderContext);
-                }
-
-                return $data;
-            }
-
-            $offset = 0;
-            if (isset($args['after'])) {
-                $after = base64_decode($args['after'], true);
-                if (false === $after) {
-                    throw Error::createLocatedError(sprintf('Cursor %s is invalid', $args['after']), $info->fieldNodes, $info->path);
-                }
-                $offset = 1 + (int) $after;
-            }
-
-            $data = ['totalCount' => 0.0, 'edges' => [], 'pageInfo' => ['endCursor' => null, 'hasNextPage' => false]];
-            if ($collection instanceof PaginatorInterface && ($totalItems = $collection->getTotalItems()) > 0) {
-                $nbPageItems = $collection->count();
-                $data['pageInfo']['endCursor'] = base64_encode((string) ($offset + $nbPageItems - 1));
-                $data['pageInfo']['hasNextPage'] = $collection->getCurrentPage() !== $collection->getLastPage() && (float) $nbPageItems === $collection->getItemsPerPage();
-                $data['totalCount'] = $totalItems;
-            }
-
-            foreach ($collection as $index => $object) {
-                $data['edges'][$index] = [
-                    'node' => $this->normalizer->normalize($object, ItemNormalizer::FORMAT, $dataProviderContext),
-                    'cursor' => base64_encode((string) ($index + $offset)),
-                ];
-            }
-
-            return $data;
+            return ($this->serializeStage)($collection, $resourceClass, $operationName, $resolverContext);
         };
-    }
-
-    /**
-     * @throws ResourceClassNotSupportedException
-     *
-     * @return object|null
-     */
-    private function getSubresource(string $rootClass, array $rootResolvedFields, array $rootIdentifiers, string $rootProperty, string $subresourceClass, bool $isCollection, array $normalizationContext)
-    {
-        $identifiers = [];
-        $resolvedIdentifiers = [];
-        foreach ($rootIdentifiers as $rootIdentifier) {
-            if (isset($rootResolvedFields[$rootIdentifier])) {
-                $identifiers[$rootIdentifier] = $rootResolvedFields[$rootIdentifier];
-            }
-
-            $resolvedIdentifiers[] = [$rootIdentifier, $rootClass];
-        }
-
-        return $this->subresourceDataProvider->getSubresource($subresourceClass, $identifiers, $normalizationContext + [
-            'property' => $rootProperty,
-            'identifiers' => $resolvedIdentifiers,
-            'collection' => $isCollection,
-        ]);
-    }
-
-    private function getNormalizedFilters(array $args): array
-    {
-        $filters = $args;
-
-        foreach ($filters as $name => $value) {
-            if (\is_array($value)) {
-                if (strpos($name, '_list')) {
-                    $name = substr($name, 0, \strlen($name) - \strlen('_list'));
-                }
-                $filters[$name] = $this->getNormalizedFilters($value);
-            }
-
-            if (\is_string($name) && strpos($name, '_')) {
-                // Gives a chance to relations/nested fields.
-                $filters[str_replace('_', '.', $name)] = $value;
-            }
-        }
-
-        return $filters;
     }
 }

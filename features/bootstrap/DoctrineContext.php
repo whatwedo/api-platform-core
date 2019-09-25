@@ -11,15 +11,25 @@
 
 declare(strict_types=1);
 
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Address as AddressDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Answer as AnswerDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeItem as CompositeItemDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeLabel as CompositeLabelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositePrimitiveItem as CompositePrimitiveItemDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeRelation as CompositeRelationDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedBoolean as ConvertedBoolDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedDate as ConvertedDateDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedInteger as ConvertedIntegerDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedOwner as ConvertedOwnerDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedRelated as ConvertedRelatedDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedString as ConvertedStringDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Customer as CustomerDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Dummy as DummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyAggregateOffer as DummyAggregateOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCar as DummyCarDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCarColor as DummyCarColorDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCustomMutation as DummyCustomMutationDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCustomQuery as DummyCustomQueryDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDate as DummyDateDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoCustom as DummyDtoCustomDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoNoInput as DummyDtoNoInputDocument;
@@ -29,6 +39,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyGroup as DummyGroup
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyOffer as DummyOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyProduct as DummyProductDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyProperty as DummyPropertyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyTableInheritanceNotApiResourceChild as DummyTableInheritanceNotApiResourceChildDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\EmbeddableDummy as EmbeddableDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\EmbeddedDummy as EmbeddedDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FileConfigDummy as FileConfigDummyDocument;
@@ -37,9 +48,11 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FooDummy as FooDummyDocu
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FourthLevel as FourthLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Greeting as GreetingDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\MaxDepthDummy as MaxDepthDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Order as OrderDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Person as PersonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\PersonToPet as PersonToPetDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Pet as PetDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Product as ProductDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Question as QuestionDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedDummy as RelatedDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedOwnedDummy as RelatedOwnedDummyDocument;
@@ -47,18 +60,30 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedOwningDummy as Re
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelatedToDummyFriend as RelatedToDummyFriendDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\RelationEmbedder as RelationEmbedderDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\SecuredDummy as SecuredDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\SoMany as SoManyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Taxon as TaxonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ThirdLevel as ThirdLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\User as UserDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Address;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Answer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeLabel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositePrimitiveItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeRelation;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Container;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedBoolean;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedDate;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedInteger;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedOwner;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedRelated;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedString;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Customer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyAggregateOffer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCar;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCarColor;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCustomMutation;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCustomQuery;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDate;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoCustom;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoNoInput;
@@ -69,18 +94,23 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyImmutableDate;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyOffer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyProduct;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyProperty;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyTableInheritanceNotApiResourceChild;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\EmbeddableDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\EmbeddedDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ExternalUser;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FileConfigDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Foo;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FooDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FourthLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Greeting;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\InternalUser;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\MaxDepthDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Node;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Order;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Person;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PersonToPet;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Pet;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Product;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Question;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RamseyUuidDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
@@ -89,14 +119,19 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedOwningDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedToDummyFriend;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelationEmbedder;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\SecuredDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Site;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\SoMany;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Taxon;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ThirdLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\User;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UuidIdentifierDummy;
 use Behat\Behat\Context\Context;
+use Behat\Gherkin\Node\PyStringNode;
 use Doctrine\Common\Persistence\ManagerRegistry;
 use Doctrine\ODM\MongoDB\DocumentManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 
 /**
  * Defines application features from the specific context.
@@ -108,6 +143,7 @@ final class DoctrineContext implements Context
      */
     private $manager;
     private $doctrine;
+    private $passwordEncoder;
     private $schemaTool;
     private $schemaManager;
     private $classes;
@@ -119,9 +155,10 @@ final class DoctrineContext implements Context
      * You can also pass arbitrary arguments to the
      * context constructor through behat.yml.
      */
-    public function __construct(ManagerRegistry $doctrine)
+    public function __construct(ManagerRegistry $doctrine, UserPasswordEncoderInterface $passwordEncoder)
     {
         $this->doctrine = $doctrine;
+        $this->passwordEncoder = $passwordEncoder;
         $this->manager = $doctrine->getManager();
         $this->schemaTool = $this->manager instanceof EntityManagerInterface ? new SchemaTool($this->manager) : null;
         $this->schemaManager = $this->manager instanceof DocumentManager ? $this->manager->getSchemaManager() : null;
@@ -152,10 +189,37 @@ final class DoctrineContext implements Context
             $dummy->setAlias('Alias #'.($nb - $i));
             $dummy->setDummy('SomeDummyTest'.$i);
             $dummy->setDescription($descriptions[($i - 1) % 2]);
+            $dummy->nameConverted = 'Converted '.$i;
 
             $this->manager->persist($dummy);
         }
 
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb of these so many objects
+     */
+    public function thereAreOfTheseSoManyObjects(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $dummy = $this->isOrm() ? new SoMany() : new SoManyDocument();
+            $dummy->content = 'Many #'.$i;
+
+            $this->manager->persist($dummy);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @When some dummy table inheritance data but not api resource child are created
+     */
+    public function someDummyTableInheritanceDataButNotApiResourceChildAreCreated()
+    {
+        $dummy = $this->buildDummyTableInheritanceNotApiResourceChild();
+        $dummy->setName('Foobarbaz inheritance');
+        $this->manager->persist($dummy);
         $this->manager->flush();
     }
 
@@ -230,6 +294,7 @@ final class DoctrineContext implements Context
             foreach (['foo', 'bar', 'baz'] as $property) {
                 $dummyProperty->{$property} = $dummyGroup->{$property} = ucfirst($property).' #'.$i;
             }
+            $dummyProperty->nameConverted = "NameConverted #$i";
 
             $dummyProperty->group = $dummyGroup;
 
@@ -355,6 +420,7 @@ final class DoctrineContext implements Context
             $dummy = $this->buildDummy();
             $dummy->setName('Dummy #'.$i);
             $dummy->setAlias('Alias #'.($nb - $i));
+            $dummy->nameConverted = "Converted $i";
             $dummy->setRelatedDummy($relatedDummy);
 
             $this->manager->persist($relatedDummy);
@@ -391,6 +457,35 @@ final class DoctrineContext implements Context
             $dummyDto->ipsum = $i / 3;
 
             $this->manager->persist($dummyDto);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb dummyCustomQuery objects
+     */
+    public function thereAreDummyCustomQueryObjects(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $dummyCustomQuery = $this->buildDummyCustomQuery();
+
+            $this->manager->persist($dummyCustomQuery);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb dummyCustomMutation objects
+     */
+    public function thereAreDummyCustomMutationObjects(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $customMutationDummy = $this->buildDummyCustomMutation();
+            $customMutationDummy->setOperandA(3);
+
+            $this->manager->persist($customMutationDummy);
         }
 
         $this->manager->flush();
@@ -596,6 +691,66 @@ final class DoctrineContext implements Context
             }
 
             $this->manager->persist($dummy);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb convertedDate objects
+     */
+    public function thereAreconvertedDateObjectsWith(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $convertedDate = $this->buildConvertedDate();
+            $convertedDate->nameConverted = new \DateTime(sprintf('2015-04-%d', $i), new \DateTimeZone('UTC'));
+
+            $this->manager->persist($convertedDate);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb convertedString objects
+     */
+    public function thereAreconvertedStringObjectsWith(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $convertedString = $this->buildConvertedString();
+            $convertedString->nameConverted = ($i % 2) ? "name#$i" : null;
+
+            $this->manager->persist($convertedString);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb convertedBoolean objects
+     */
+    public function thereAreconvertedBooleanObjectsWith(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $convertedBoolean = $this->buildConvertedBoolean();
+            $convertedBoolean->nameConverted = (bool) ($i % 2);
+
+            $this->manager->persist($convertedBoolean);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb convertedInteger objects
+     */
+    public function thereAreconvertedIntegerObjectsWith(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $convertedInteger = $this->buildConvertedInteger();
+            $convertedInteger->nameConverted = $i;
+
+            $this->manager->persist($convertedInteger);
         }
 
         $this->manager->flush();
@@ -919,8 +1074,7 @@ final class DoctrineContext implements Context
     public function thePasswordForUserShouldBeHashed(string $password, string $user)
     {
         $user = $this->doctrine->getRepository($this->isOrm() ? User::class : UserDocument::class)->find($user);
-
-        if (!password_verify($password, $user->getPassword())) {
+        if (!$this->passwordEncoder->isPasswordValid($user, $password)) {
             throw new \Exception('User password mismatch');
         }
     }
@@ -1208,6 +1362,129 @@ final class DoctrineContext implements Context
         $this->manager->clear();
     }
 
+    /**
+     * @Given there is an order with same customer and recipient
+     */
+    public function thereIsAnOrderWithSameCustomerAndRecipient()
+    {
+        $customer = $this->isOrm() ? new Customer() : new CustomerDocument();
+        $customer->name = 'customer_name';
+
+        $address1 = $this->isOrm() ? new Address() : new AddressDocument();
+        $address1->name = 'foo';
+        $address2 = $this->isOrm() ? new Address() : new AddressDocument();
+        $address2->name = 'bar';
+
+        $order = $this->isOrm() ? new Order() : new OrderDocument();
+        $order->recipient = $customer;
+        $order->customer = $customer;
+
+        $customer->addresses->add($address1);
+        $customer->addresses->add($address2);
+
+        $this->manager->persist($address1);
+        $this->manager->persist($address2);
+        $this->manager->persist($customer);
+        $this->manager->persist($order);
+
+        $this->manager->flush();
+        $this->manager->clear();
+    }
+
+    /**
+     * @Given there are :nb sites with internal owner
+     */
+    public function thereAreSitesWithInternalOwner(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $internalUser = new InternalUser();
+            $internalUser->setFirstname('Internal');
+            $internalUser->setLastname('User');
+            $internalUser->setEmail('john.doe@example.com');
+            $internalUser->setInternalId('INT');
+            $site = new Site();
+            $site->setTitle('title');
+            $site->setDescription('description');
+            $site->setOwner($internalUser);
+            $this->manager->persist($site);
+        }
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb sites with external owner
+     */
+    public function thereAreSitesWithExternalOwner(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $externalUser = new ExternalUser();
+            $externalUser->setFirstname('External');
+            $externalUser->setLastname('User');
+            $externalUser->setEmail('john.doe@example.com');
+            $externalUser->setExternalId('EXT');
+            $site = new Site();
+            $site->setTitle('title');
+            $site->setDescription('description');
+            $site->setOwner($externalUser);
+            $this->manager->persist($site);
+        }
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is the following taxon:
+     */
+    public function thereIsTheFollowingTaxon(PyStringNode $dataNode): void
+    {
+        $data = json_decode((string) $dataNode, true);
+
+        $taxon = $this->isOrm() ? new Taxon() : new TaxonDocument();
+        $taxon->setCode($data['code']);
+        $this->manager->persist($taxon);
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is the following product:
+     */
+    public function thereIsTheFollowingProduct(PyStringNode $dataNode): void
+    {
+        $data = json_decode((string) $dataNode, true);
+
+        $product = $this->isOrm() ? new Product() : new ProductDocument();
+        $product->setCode($data['code']);
+        if (isset($data['mainTaxon'])) {
+            $mainTaxonCode = str_replace('/taxons/', '', $data['mainTaxon']);
+            $mainTaxon = $this->manager->getRepository($this->isOrm() ? Taxon::class : TaxonDocument::class)->findOneBy([
+                'code' => $mainTaxonCode,
+            ]);
+            $product->setMainTaxon($mainTaxon);
+        }
+        $this->manager->persist($product);
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb convertedOwner objects with convertedRelated
+     */
+    public function thereAreConvertedOwnerObjects(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $related = $this->buildConvertedRelated();
+            $related->nameConverted = 'Converted '.$i;
+
+            $owner = $this->buildConvertedOwner();
+            $owner->nameConverted = $related;
+
+            $this->manager->persist($related);
+            $this->manager->persist($owner);
+        }
+
+        $this->manager->flush();
+    }
+
     private function isOrm(): bool
     {
         return null !== $this->schemaTool;
@@ -1267,6 +1544,14 @@ final class DoctrineContext implements Context
     }
 
     /**
+     * @return DummyTableInheritanceNotApiResourceChild|DummyTableInheritanceNotApiResourceChildDocument
+     */
+    private function buildDummyTableInheritanceNotApiResourceChild()
+    {
+        return $this->isOrm() ? new DummyTableInheritanceNotApiResourceChild() : new DummyTableInheritanceNotApiResourceChildDocument();
+    }
+
+    /**
      * @return DummyAggregateOffer|DummyAggregateOfferDocument
      */
     private function buildDummyAggregateOffer()
@@ -1312,6 +1597,22 @@ final class DoctrineContext implements Context
     private function buildDummyDtoNoOutput()
     {
         return $this->isOrm() ? new DummyDtoNoOutput() : new DummyDtoNoOutputDocument();
+    }
+
+    /**
+     * @return DummyCustomQuery|DummyCustomQueryDocument
+     */
+    private function buildDummyCustomQuery()
+    {
+        return $this->isOrm() ? new DummyCustomQuery() : new DummyCustomQueryDocument();
+    }
+
+    /**
+     * @return DummyCustomMutation|DummyCustomMutationDocument
+     */
+    private function buildDummyCustomMutation()
+    {
+        return $this->isOrm() ? new DummyCustomMutation() : new DummyCustomMutationDocument();
     }
 
     /**
@@ -1504,5 +1805,53 @@ final class DoctrineContext implements Context
     private function buildThirdLevel()
     {
         return $this->isOrm() ? new ThirdLevel() : new ThirdLevelDocument();
+    }
+
+    /**
+     * @return ConvertedDate|ConvertedDateDocument
+     */
+    private function buildConvertedDate()
+    {
+        return $this->isOrm() ? new ConvertedDate() : new ConvertedDateDocument();
+    }
+
+    /**
+     * @return ConvertedBoolean|ConvertedBoolDocument
+     */
+    private function buildConvertedBoolean()
+    {
+        return $this->isOrm() ? new ConvertedBoolean() : new ConvertedBoolDocument();
+    }
+
+    /**
+     * @return ConvertedInteger|ConvertedIntegerDocument
+     */
+    private function buildConvertedInteger()
+    {
+        return $this->isOrm() ? new ConvertedInteger() : new ConvertedIntegerDocument();
+    }
+
+    /**
+     * @return ConvertedString|ConvertedStringDocument
+     */
+    private function buildConvertedString()
+    {
+        return $this->isOrm() ? new ConvertedString() : new ConvertedStringDocument();
+    }
+
+    /**
+     * @return ConvertedOwner|ConvertedOwnerDocument
+     */
+    private function buildConvertedOwner()
+    {
+        return $this->isOrm() ? new ConvertedOwner() : new ConvertedOwnerDocument();
+    }
+
+    /**
+     * @return ConvertedRelated|ConvertedRelatedDocument
+     */
+    private function buildConvertedRelated()
+    {
+        return $this->isOrm() ? new ConvertedRelated() : new ConvertedRelatedDocument();
     }
 }

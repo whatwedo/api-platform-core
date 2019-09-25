@@ -23,7 +23,7 @@ class ResourceListTest extends TestCase
      */
     private $resourceList;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->resourceList = new ResourceList();
     }
@@ -31,12 +31,5 @@ class ResourceListTest extends TestCase
     public function testImplementsArrayObject()
     {
         $this->assertInstanceOf(\ArrayObject::class, $this->resourceList);
-    }
-
-    public function testSerialize()
-    {
-        $this->resourceList['foo'] = 'bar';
-
-        $this->assertEquals('N;', serialize($this->resourceList));
     }
 }

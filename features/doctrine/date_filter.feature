@@ -413,7 +413,7 @@ Feature: Date filter on collections
       },
       "hydra:search": {
         "@type": "hydra:IriTemplate",
-        "hydra:template": "/dummies{?dummyBoolean,relatedDummy.embeddedDummy.dummyBoolean,dummyDate[before],dummyDate[strictly_before],dummyDate[after],dummyDate[strictly_after],relatedDummy.dummyDate[before],relatedDummy.dummyDate[strictly_before],relatedDummy.dummyDate[after],relatedDummy.dummyDate[strictly_after],description[exists],relatedDummy.name[exists],dummyBoolean[exists],relatedDummy[exists],dummyFloat,dummyFloat[],dummyPrice,dummyPrice[],order[id],order[name],order[description],order[relatedDummy.name],order[relatedDummy.symfony],order[dummyDate],dummyFloat[between],dummyFloat[gt],dummyFloat[gte],dummyFloat[lt],dummyFloat[lte],dummyPrice[between],dummyPrice[gt],dummyPrice[gte],dummyPrice[lt],dummyPrice[lte],id,id[],name,alias,description,relatedDummy.name,relatedDummy.name[],relatedDummies,relatedDummies[],dummy,relatedDummies.name,relatedDummy.thirdLevel.level,relatedDummy.thirdLevel.level[],relatedDummy.thirdLevel.fourthLevel.level,relatedDummy.thirdLevel.fourthLevel.level[],relatedDummy.thirdLevel.badFourthLevel.level,relatedDummy.thirdLevel.badFourthLevel.level[],relatedDummy.thirdLevel.fourthLevel.badThirdLevel.level,relatedDummy.thirdLevel.fourthLevel.badThirdLevel.level[],properties[]}",
+        "hydra:template": "/dummies{?dummyBoolean,relatedDummy.embeddedDummy.dummyBoolean,dummyDate[before],dummyDate[strictly_before],dummyDate[after],dummyDate[strictly_after],relatedDummy.dummyDate[before],relatedDummy.dummyDate[strictly_before],relatedDummy.dummyDate[after],relatedDummy.dummyDate[strictly_after],exists[alias],exists[description],exists[relatedDummy.name],exists[dummyBoolean],exists[relatedDummy],dummyFloat,dummyFloat[],dummyPrice,dummyPrice[],order[id],order[name],order[description],order[relatedDummy.name],order[relatedDummy.symfony],order[dummyDate],dummyFloat[between],dummyFloat[gt],dummyFloat[gte],dummyFloat[lt],dummyFloat[lte],dummyPrice[between],dummyPrice[gt],dummyPrice[gte],dummyPrice[lt],dummyPrice[lte],id,id[],name,alias,description,relatedDummy.name,relatedDummy.name[],relatedDummies,relatedDummies[],dummy,relatedDummies.name,relatedDummy.thirdLevel.level,relatedDummy.thirdLevel.level[],relatedDummy.thirdLevel.fourthLevel.level,relatedDummy.thirdLevel.fourthLevel.level[],relatedDummy.thirdLevel.badFourthLevel.level,relatedDummy.thirdLevel.badFourthLevel.level[],relatedDummy.thirdLevel.fourthLevel.badThirdLevel.level,relatedDummy.thirdLevel.fourthLevel.badThirdLevel.level[],name_converted,properties[]}",
         "hydra:variableRepresentation": "BasicRepresentation",
         "hydra:mapping": [
           {
@@ -478,25 +478,31 @@ Feature: Date filter on collections
           },
           {
             "@type": "IriTemplateMapping",
-            "variable": "description[exists]",
+            "variable": "exists[alias]",
+            "property": "alias",
+            "required": false
+          },
+          {
+            "@type": "IriTemplateMapping",
+            "variable": "exists[description]",
             "property": "description",
             "required": false
           },
           {
             "@type": "IriTemplateMapping",
-            "variable": "relatedDummy.name[exists]",
+            "variable": "exists[relatedDummy.name]",
             "property": "relatedDummy.name",
             "required": false
           },
           {
             "@type": "IriTemplateMapping",
-            "variable": "dummyBoolean[exists]",
+            "variable": "exists[dummyBoolean]",
             "property": "dummyBoolean",
             "required": false
           },
           {
             "@type": "IriTemplateMapping",
-            "variable": "relatedDummy[exists]",
+            "variable": "exists[relatedDummy]",
             "property": "relatedDummy",
             "required": false
           },
@@ -735,6 +741,12 @@ Feature: Date filter on collections
             "required": false
           },
           {
+            "@type": "IriTemplateMapping",
+            "variable": "name_converted",
+            "property": "name_converted",
+            "required": false
+          },
+          {
               "@type": "IriTemplateMapping",
               "variable": "properties[]",
               "property": null,
@@ -840,7 +852,7 @@ Feature: Date filter on collections
           },
           "hydra:search": {
               "@type": "hydra:IriTemplate",
-              "hydra:template": "/dummies{?dummyBoolean,dummyDate[before],dummyDate[after],relatedDummy.dummyDate[before],relatedDummy.dummyDate[strictly_before],relatedDummy.dummyDate[after],relatedDummy.dummyDate[strictly_after],description[exists],relatedDummy.name[exists],dummyBoolean[exists],relatedDummy[exists],dummyFloat,dummyPrice,order[id],order[name],order[relatedDummy.symfony],dummyFloat[between],dummyFloat[gt],dummyFloat[gte],dummyFloat[lt],dummyFloat[lte],dummyPrice[between],dummyPrice[gt],dummyPrice[gte],dummyPrice[lt],dummyPrice[lte],id,id[],name,alias,description,relatedDummy.name,relatedDummy.name[],relatedDummies,relatedDummies[],dummy,relatedDummies.name}",
+              "hydra:template": "/dummies{?dummyBoolean,dummyDate[before],dummyDate[after],relatedDummy.dummyDate[before],relatedDummy.dummyDate[strictly_before],relatedDummy.dummyDate[after],relatedDummy.dummyDate[strictly_after],exists[description],exists[relatedDummy.name],exists[dummyBoolean],exists[relatedDummy],dummyFloat,dummyPrice,order[id],order[name],order[relatedDummy.symfony],dummyFloat[between],dummyFloat[gt],dummyFloat[gte],dummyFloat[lt],dummyFloat[lte],dummyPrice[between],dummyPrice[gt],dummyPrice[gte],dummyPrice[lt],dummyPrice[lte],id,id[],name,alias,description,relatedDummy.name,relatedDummy.name[],relatedDummies,relatedDummies[],dummy,relatedDummies.name}",
               "hydra:variableRepresentation": "BasicRepresentation",
               "hydra:mapping": [
                   {
@@ -899,25 +911,25 @@ Feature: Date filter on collections
                   },
                   {
                       "@type": "IriTemplateMapping",
-                      "variable": "description[exists]",
+                      "variable": "exists[description]",
                       "property": "description",
                       "required": false
                   },
                   {
                       "@type": "IriTemplateMapping",
-                      "variable": "relatedDummy.name[exists]",
+                      "variable": "exists[relatedDummy.name]",
                       "property": "relatedDummy.name",
                       "required": false
                   },
                   {
                     "@type": "IriTemplateMapping",
-                    "variable": "relatedDummy[exists]",
+                    "variable": "exists[relatedDummy]",
                     "property": "relatedDummy",
                     "required": false
                   },
                   {
                       "@type": "IriTemplateMapping",
-                      "variable": "dummyBoolean[exists]",
+                      "variable": "exists[dummyBoolean]",
                       "property": "dummyBoolean",
                       "required": false
                   },
@@ -1093,6 +1105,81 @@ Feature: Date filter on collections
             }
           }
         }
+      }
+    }
+    """
+
+  @createSchema
+  Scenario: Get collection filtered using a name converter
+    Given there are 30 convertedDate objects
+    When I send a "GET" request to "/converted_dates?name_converted[strictly_after]=2015-04-28"
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/ld+json; charset=utf-8"
+    And the JSON should be valid according to this schema:
+    """
+    {
+      "type": "object",
+      "properties": {
+        "@context": {"pattern": "^/contexts/ConvertedDate"},
+        "@id": {"pattern": "^/converted_dates"},
+        "@type": {"pattern": "^hydra:Collection$"},
+        "hydra:member": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "@id": {"pattern": "^/converted_dates/(29|30)$"},
+              "@type":  {"pattern": "^ConvertedDate"},
+              "name_converted": {"type": "string"},
+              "id": {"type": "integer", "minimum":29, "maximum": 30}
+            },
+            "required": ["@id", "@type", "name_converted", "id"],
+            "additionalProperties": false
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        },
+        "hydra:totalItems": {"type": "integer", "minimum": 2, "maximum": 2},
+        "hydra:view": {
+          "type": "object",
+          "properties": {
+            "@id": {"pattern": "^/converted_dates\\?name_converted%5Bstrictly_after%5D=2015\\-04\\-28$"},
+            "@type": {"pattern": "^hydra:PartialCollectionView$"}
+          },
+          "required": ["@id", "@type"],
+          "additionalProperties": false
+        },
+        "hydra:search": {
+          "type": "object",
+          "properties": {
+            "@type": {"pattern": "^hydra:IriTemplate$"},
+            "hydra:template": {"pattern": "^/converted_dates\\{\\?.*name_converted\\[before\\],name_converted\\[strictly_before\\],name_converted\\[after\\],name_converted\\[strictly_after\\].*\\}$"},
+            "hydra:variableRepresentation": {"pattern": "^BasicRepresentation$"},
+            "hydra:mapping": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "@type": {"pattern": "^IriTemplateMapping$"},
+                  "variable": {"pattern": "^name_converted(\\[(strictly_)?(before|after)\\])$"},
+                  "property": {"pattern": "^name_converted$"},
+                  "required": {"type": "boolean"}
+                },
+                "required": ["@type", "variable", "property", "required"],
+                "additionalProperties": false
+              },
+              "minItems": 4,
+              "maxItems": 4,
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false,
+          "required": ["@type", "hydra:template", "hydra:variableRepresentation", "hydra:mapping"]
+        },
+        "additionalProperties": false,
+        "required": ["@context", "@id", "@type", "hydra:member", "hydra:totalItems", "hydra:view", "hydra:search"]
       }
     }
     """

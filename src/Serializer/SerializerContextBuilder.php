@@ -65,8 +65,8 @@ final class SerializerContextBuilder implements SerializerContextBuilderInterfac
         }
 
         $context['resource_class'] = $attributes['resource_class'];
-        $context['input'] = $resourceMetadata->getTypedOperationAttribute($operationType, $attributes[$operationKey], 'input', $resourceMetadata->getAttribute('input'));
-        $context['output'] = $resourceMetadata->getTypedOperationAttribute($operationType, $attributes[$operationKey], 'output', $resourceMetadata->getAttribute('output'));
+        $context['input'] = $resourceMetadata->getTypedOperationAttribute($operationType, $attributes[$operationKey], 'input', null, true);
+        $context['output'] = $resourceMetadata->getTypedOperationAttribute($operationType, $attributes[$operationKey], 'output', null, true);
         $context['request_uri'] = $request->getRequestUri();
         $context['uri'] = $request->getUri();
 
@@ -88,6 +88,18 @@ final class SerializerContextBuilder implements SerializerContextBuilderInterfac
         }
 
         unset($context[DocumentationNormalizer::SWAGGER_DEFINITION_NAME]);
+
+        if (isset($context['skip_null_values'])) {
+            return $context;
+        }
+
+        foreach ($resourceMetadata->getItemOperations() as $operation) {
+            if ('PATCH' === $operation['method'] && \in_array('application/merge-patch+json', $operation['input_formats']['json'] ?? [], true)) {
+                $context['skip_null_values'] = true;
+
+                break;
+            }
+        }
 
         return $context;
     }

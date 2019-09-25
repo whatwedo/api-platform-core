@@ -52,10 +52,12 @@ final class ApiLoader extends Loader
     private $resourceClassDirectories;
     private $subresourceOperationFactory;
     private $graphqlEnabled;
+    private $graphiQlEnabled;
+    private $graphQlPlaygroundEnabled;
     private $entrypointEnabled;
     private $docsEnabled;
 
-    public function __construct(KernelInterface $kernel, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, ResourceMetadataFactoryInterface $resourceMetadataFactory, OperationPathResolverInterface $operationPathResolver, ContainerInterface $container, array $formats, array $resourceClassDirectories = [], SubresourceOperationFactoryInterface $subresourceOperationFactory = null, bool $graphqlEnabled = false, bool $entrypointEnabled = true, bool $docsEnabled = true)
+    public function __construct(KernelInterface $kernel, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, ResourceMetadataFactoryInterface $resourceMetadataFactory, OperationPathResolverInterface $operationPathResolver, ContainerInterface $container, array $formats, array $resourceClassDirectories = [], SubresourceOperationFactoryInterface $subresourceOperationFactory = null, bool $graphqlEnabled = false, bool $entrypointEnabled = true, bool $docsEnabled = true, bool $graphiQlEnabled = false, bool $graphQlPlaygroundEnabled = false)
     {
         /** @var string[]|string $paths */
         $paths = $kernel->locateResource('@ApiPlatformBundle/Resources/config/routing');
@@ -68,6 +70,8 @@ final class ApiLoader extends Loader
         $this->resourceClassDirectories = $resourceClassDirectories;
         $this->subresourceOperationFactory = $subresourceOperationFactory;
         $this->graphqlEnabled = $graphqlEnabled;
+        $this->graphiQlEnabled = $graphiQlEnabled;
+        $this->graphQlPlaygroundEnabled = $graphQlPlaygroundEnabled;
         $this->entrypointEnabled = $entrypointEnabled;
         $this->docsEnabled = $docsEnabled;
     }
@@ -166,9 +170,21 @@ final class ApiLoader extends Loader
         }
 
         if ($this->graphqlEnabled) {
-            $graphqlCollection = $this->fileLoader->load('graphql.xml');
+            $graphqlCollection = $this->fileLoader->load('graphql/graphql.xml');
             $graphqlCollection->addDefaults(['_graphql' => true]);
             $routeCollection->addCollection($graphqlCollection);
+        }
+
+        if ($this->graphiQlEnabled) {
+            $graphiQlCollection = $this->fileLoader->load('graphql/graphiql.xml');
+            $graphiQlCollection->addDefaults(['_graphql' => true]);
+            $routeCollection->addCollection($graphiQlCollection);
+        }
+
+        if ($this->graphQlPlaygroundEnabled) {
+            $graphQlPlaygroundCollection = $this->fileLoader->load('graphql/graphql_playground.xml');
+            $graphQlPlaygroundCollection->addDefaults(['_graphql' => true]);
+            $routeCollection->addCollection($graphQlPlaygroundCollection);
         }
 
         if (isset($this->formats['jsonld'])) {
@@ -186,6 +202,10 @@ final class ApiLoader extends Loader
         $resourceShortName = $resourceMetadata->getShortName();
 
         if (isset($operation['route_name'])) {
+            if (!isset($operation['method'])) {
+                @trigger_error(sprintf('Not setting the "method" attribute is deprecated and will not be supported anymore in API Platform 3.0, set it for the %s operation "%s" of the class "%s".', OperationType::COLLECTION === $operationType ? 'collection' : 'item', $operationName, $resourceClass), E_USER_DEPRECATED);
+            }
+
             return;
         }
 

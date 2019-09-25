@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\Bridge\Doctrine\Orm\Extension;
 
+use ApiPlatform\Core\Bridge\Doctrine\Orm\AbstractPaginator;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\ContextAwareQueryResultCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Util\QueryNameGenerator;
@@ -22,9 +23,11 @@ use ApiPlatform\Core\DataProvider\PartialPaginatorInterface;
 use ApiPlatform\Core\Exception\InvalidArgumentException;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use Doctrine\Common\Persistence\ManagerRegistry;
 use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\Tools\Pagination\CountWalker;
@@ -485,7 +488,7 @@ class PaginationExtensionTest extends TestCase
             $resourceMetadataFactory,
             $pagination
         );
-        $extension->applyToCollection($queryBuilder, new QueryNameGenerator(), 'Foo', 'op', ['filters' => ['pagination' => true, 'first' => 5, 'after' => 'OQ=='], 'graphql' => true]);
+        $extension->applyToCollection($queryBuilder, new QueryNameGenerator(), 'Foo', 'op', ['filters' => ['pagination' => true, 'first' => 5, 'after' => 'OQ=='], 'graphql_operation_name' => 'query']);
     }
 
     /**
@@ -648,13 +651,36 @@ class PaginationExtensionTest extends TestCase
         $extension->applyToCollection($queryBuilder, new QueryNameGenerator(), 'Foo', 'op');
     }
 
+    public function testApplyToCollectionGraphQlPaginationDisabled()
+    {
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, [], []));
+        $resourceMetadataFactory = $resourceMetadataFactoryProphecy->reveal();
+
+        $pagination = new Pagination($resourceMetadataFactory, [], [
+            'enabled' => false,
+        ]);
+
+        $queryBuilderProphecy = $this->prophesize(QueryBuilder::class);
+        $queryBuilderProphecy->setFirstResult(Argument::any())->shouldNotBeCalled();
+        $queryBuilderProphecy->setMaxResults(Argument::any())->shouldNotBeCalled();
+        $queryBuilder = $queryBuilderProphecy->reveal();
+
+        $extension = new PaginationExtension(
+            $this->prophesize(ManagerRegistry::class)->reveal(),
+            $resourceMetadataFactory,
+            $pagination
+        );
+        $extension->applyToCollection($queryBuilder, new QueryNameGenerator(), 'Foo', 'op', ['graphql_operation_name' => 'op']);
+    }
+
     public function testApplyToCollectionWithMaximumItemsPerPage()
     {
         $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
         $attributes = [
             'pagination_enabled' => true,
             'pagination_client_enabled' => true,
-            'maximum_items_per_page' => 80,
+            'pagination_maximum_items_per_page' => 80,
         ];
         $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, [], [], $attributes));
         $resourceMetadataFactory = $resourceMetadataFactoryProphecy->reveal();
@@ -683,6 +709,7 @@ class PaginationExtensionTest extends TestCase
      * @expectedDeprecation Passing an instance of "Symfony\Component\HttpFoundation\RequestStack" as second argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" instead.
      * @expectedDeprecation Passing an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" as third argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\DataProvider\Pagination" instead.
      * @expectedDeprecation Passing "$enabled", "$clientEnabled", "$clientItemsPerPage", "$itemsPerPage", "$pageParameterName", "$enabledParameterName", "$itemsPerPageParameterName", "$maximumItemPerPage", "$partial", "$clientPartial", "$partialParameterName" arguments is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\Bridge\Doctrine\Orm\Paginator" as third argument instead.
+     * @expectedDeprecation The "maximum_items_per_page" option has been deprecated since API Platform 2.5 in favor of "pagination_maximum_items_per_page" and will be removed in API Platform 3.
      */
     public function testLegacyApplyToCollectionWithMaximumItemsPerPage()
     {
@@ -880,9 +907,54 @@ class PaginationExtensionTest extends TestCase
         $this->assertFalse($extension->supportsResult('Foo', 'op'));
     }
 
+    public function testSupportsResultGraphQlPaginationDisabled()
+    {
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, [], []));
+        $resourceMetadataFactory = $resourceMetadataFactoryProphecy->reveal();
+
+        $pagination = new Pagination($resourceMetadataFactory, [], [
+            'enabled' => false,
+        ]);
+
+        $extension = new PaginationExtension(
+            $this->prophesize(ManagerRegistry::class)->reveal(),
+            $resourceMetadataFactory,
+            $pagination
+        );
+        $this->assertFalse($extension->supportsResult('Foo', 'op', ['graphql_operation_name' => 'op']));
+    }
+
     public function testGetResult()
     {
-        $result = $this->getPaginationExtensionResult();
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy'));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
@@ -890,26 +962,34 @@ class PaginationExtensionTest extends TestCase
 
     public function testGetResultWithoutDistinct()
     {
-        $configuration = new Configuration();
+        $dummyMetadata = new ClassMetadata(Dummy::class);
 
         $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
-        $entityManagerProphecy->getConfiguration()->willReturn($configuration)->shouldBeCalled();
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
 
         $query = new Query($entityManagerProphecy->reveal());
-        $query->setFirstResult(0);
-        $query->setMaxResults(42);
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
 
-        $queryBuilderProphecy = $this->prophesize(QueryBuilder::class);
-        $queryBuilderProphecy->getRootEntities()->willReturn([])->shouldBeCalled();
-        $queryBuilderProphecy->getAllAliases()->willReturn(['o'])->shouldBeCalled();
-        $queryBuilderProphecy->getQuery()->willReturn($query)->shouldBeCalled();
-        $queryBuilderProphecy->getDQLPart(Argument::that(function ($arg) {
-            return \in_array($arg, ['having', 'orderBy', 'join'], true);
-        }))->willReturn('')->shouldBeCalled();
-        $queryBuilderProphecy->getMaxResults()->willReturn(42)->shouldBeCalled();
-        $queryBuilder = $queryBuilderProphecy->reveal();
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
 
-        $result = $this->getPaginationExtensionResult(false, false, true, $queryBuilder);
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy'));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
@@ -924,18 +1004,81 @@ class PaginationExtensionTest extends TestCase
      */
     public function testLegacyGetResult()
     {
-        $result = $this->getLegacyPaginationExtensionResult();
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy'));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $requestStack,
+            $resourceMetadataFactoryProphecy->reveal()
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
     }
 
-    public function testGetResultWithoutFetchJoinCollection()
+    public function testGetResultWithFetchJoinCollectionDisabled()
     {
-        $result = $this->getPaginationExtensionResult(false, false, false);
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_fetch_join_collection' => false]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
+
+        $doctrinePaginatorReflectionProperty = new \ReflectionProperty(AbstractPaginator::class, 'paginator');
+        $doctrinePaginatorReflectionProperty->setAccessible(true);
+
+        $doctrinePaginator = $doctrinePaginatorReflectionProperty->getValue($result);
+        $this->assertFalse($doctrinePaginator->getFetchJoinCollection());
     }
 
     /**
@@ -943,17 +1086,170 @@ class PaginationExtensionTest extends TestCase
      * @expectedDeprecation Passing an instance of "Symfony\Component\HttpFoundation\RequestStack" as second argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" instead.
      * @expectedDeprecation Passing an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" as third argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\DataProvider\Pagination" instead.
      */
-    public function testLegacyGetResultWithoutFetchJoinCollection()
+    public function testLegacyGetResultWithFetchJoinCollectionDisabled()
     {
-        $result = $this->getLegacyPaginationExtensionResult(false, false, false);
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_fetch_join_collection' => false]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $requestStack,
+            $resourceMetadataFactoryProphecy->reveal()
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
+
+        $doctrinePaginatorReflectionProperty = new \ReflectionProperty(AbstractPaginator::class, 'paginator');
+        $doctrinePaginatorReflectionProperty->setAccessible(true);
+
+        $doctrinePaginator = $doctrinePaginatorReflectionProperty->getValue($result);
+        $this->assertFalse($doctrinePaginator->getFetchJoinCollection());
+    }
+
+    public function testGetResultWithUseOutputWalkersDisabled()
+    {
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_use_output_walkers' => false]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
+
+        $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
+        $this->assertInstanceOf(PaginatorInterface::class, $result);
+
+        $doctrinePaginatorReflectionProperty = new \ReflectionProperty(AbstractPaginator::class, 'paginator');
+        $doctrinePaginatorReflectionProperty->setAccessible(true);
+
+        $doctrinePaginator = $doctrinePaginatorReflectionProperty->getValue($result);
+        $this->assertFalse($doctrinePaginator->getUseOutputWalkers());
+    }
+
+    /**
+     * @group legacy
+     * @expectedDeprecation Passing an instance of "Symfony\Component\HttpFoundation\RequestStack" as second argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" instead.
+     * @expectedDeprecation Passing an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" as third argument of "ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\PaginationExtension" is deprecated since API Platform 2.4 and will not be possible anymore in API Platform 3. Pass an instance of "ApiPlatform\Core\DataProvider\Pagination" instead.
+     */
+    public function testLegacyGetResultWithUseOutputWalkersDisabled()
+    {
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_use_output_walkers' => false]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $requestStack,
+            $resourceMetadataFactoryProphecy->reveal()
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
+
+        $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
+        $this->assertInstanceOf(PaginatorInterface::class, $result);
+
+        $doctrinePaginatorReflectionProperty = new \ReflectionProperty(AbstractPaginator::class, 'paginator');
+        $doctrinePaginatorReflectionProperty->setAccessible(true);
+
+        $doctrinePaginator = $doctrinePaginatorReflectionProperty->getValue($result);
+        $this->assertFalse($doctrinePaginator->getUseOutputWalkers());
     }
 
     public function testGetResultWithPartial()
     {
-        $result = $this->getPaginationExtensionResult(true);
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_partial' => true]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertNotInstanceOf(PaginatorInterface::class, $result);
@@ -966,7 +1262,37 @@ class PaginationExtensionTest extends TestCase
      */
     public function testLegacyGetResultWithPartial()
     {
-        $result = $this->getLegacyPaginationExtensionResult(true);
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn(new ResourceMetadata('Dummy', null, null, null, null, ['pagination_partial' => true]));
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $requestStack,
+            $resourceMetadataFactoryProphecy->reveal()
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder, Dummy::class, 'get');
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertNotInstanceOf(PaginatorInterface::class, $result);
@@ -974,7 +1300,33 @@ class PaginationExtensionTest extends TestCase
 
     public function testSimpleGetResult()
     {
-        $result = $this->getPaginationExtensionResult(false, true);
+        $dummyMetadata = new ClassMetadata(Dummy::class);
+
+        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
+
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
+
+        $query = new Query($entityManagerProphecy->reveal());
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
+
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+
+        $paginationExtension = new PaginationExtension(
+            $managerRegistryProphecy->reveal(),
+            $resourceMetadataFactoryProphecy->reveal(),
+            new Pagination($resourceMetadataFactoryProphecy->reveal())
+        );
+
+        $result = $paginationExtension->getResult($queryBuilder);
 
         $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
         $this->assertInstanceOf(PaginatorInterface::class, $result);
@@ -987,102 +1339,38 @@ class PaginationExtensionTest extends TestCase
      */
     public function testLegacySimpleGetResult()
     {
-        $result = $this->getLegacyPaginationExtensionResult(false, true);
-
-        $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
-        $this->assertInstanceOf(PaginatorInterface::class, $result);
-    }
-
-    private function getPaginationExtensionResult(bool $partial = false, bool $legacy = false, bool $fetchJoinCollection = true, QueryBuilder $queryBuilder = null)
-    {
-        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
-        $resourceMetadataFactory = $resourceMetadataFactoryProphecy->reveal();
-
-        if (!$legacy) {
-            $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, [], [], ['pagination_partial' => false, 'pagination_client_partial' => true, 'pagination_fetch_join_collection' => $fetchJoinCollection]));
-        }
-
-        $pagination = new Pagination($resourceMetadataFactory);
-
-        $configuration = new Configuration();
+        $dummyMetadata = new ClassMetadata(Dummy::class);
 
         $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
-        $entityManagerProphecy->getConfiguration()->willReturn($configuration);
+        $entityManagerProphecy->getConfiguration()->willReturn(new Configuration());
+        $entityManagerProphecy->getClassMetadata(Dummy::class)->willReturn($dummyMetadata);
 
-        if (null === $queryBuilder) {
-            $query = new Query($entityManagerProphecy->reveal());
-            $query->setFirstResult(0);
-            $query->setMaxResults(42);
-
-            $queryBuilderProphecy = $this->prophesize(QueryBuilder::class);
-            $queryBuilderProphecy->getRootEntities()->willReturn([])->shouldBeCalled();
-            $queryBuilderProphecy->getAllAliases()->willReturn([])->shouldBeCalled();
-            $queryBuilderProphecy->getQuery()->willReturn($query)->shouldBeCalled();
-            $queryBuilderProphecy->getDQLPart(Argument::that(function ($arg) {
-                return \in_array($arg, ['having', 'orderBy', 'join'], true);
-            }))->willReturn('')->shouldBeCalled();
-            $queryBuilderProphecy->getMaxResults()->willReturn(42)->shouldBeCalled();
-            $queryBuilder = $queryBuilderProphecy->reveal();
-        }
-
-        $paginationExtension = new PaginationExtension(
-            $this->prophesize(ManagerRegistry::class)->reveal(),
-            $resourceMetadataFactory,
-            $pagination
-        );
-
-        $args = [$queryBuilder, null, null, ['filters' => ['partial' => $partial]]];
-
-        if (!$legacy) {
-            $args[1] = 'Foo';
-            $args[2] = null;
-        }
-
-        return $paginationExtension->getResult(...$args);
-    }
-
-    private function getLegacyPaginationExtensionResult(bool $partial = false, bool $legacy = false, bool $fetchJoinCollection = true)
-    {
-        $requestStack = new RequestStack();
-        $requestStack->push(new Request(['partial' => $partial]));
-
-        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
-
-        if (!$legacy) {
-            $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, [], [], ['pagination_partial' => false, 'pagination_client_partial' => true, 'pagination_fetch_join_collection' => $fetchJoinCollection]))->shouldBeCalled();
-        }
-
-        $configuration = new Configuration();
-
-        $entityManagerProphecy = $this->prophesize(EntityManagerInterface::class);
-        $entityManagerProphecy->getConfiguration()->willReturn($configuration)->shouldBeCalled();
+        $queryBuilder = new QueryBuilder($entityManagerProphecy->reveal());
+        $queryBuilder->select(['o']);
+        $queryBuilder->from(Dummy::class, 'o');
+        $queryBuilder->setFirstResult(0);
+        $queryBuilder->setMaxResults(42);
 
         $query = new Query($entityManagerProphecy->reveal());
-        $query->setFirstResult(0);
-        $query->setMaxResults(42);
+        $entityManagerProphecy->createQuery($queryBuilder->getDQL())->willReturn($query);
 
-        $queryBuilderProphecy = $this->prophesize(QueryBuilder::class);
-        $queryBuilderProphecy->getRootEntities()->willReturn([])->shouldBeCalled();
-        $queryBuilderProphecy->getAllAliases()->willReturn([])->shouldBeCalled();
-        $queryBuilderProphecy->getQuery()->willReturn($query)->shouldBeCalled();
-        $queryBuilderProphecy->getDQLPart(Argument::that(function ($arg) {
-            return \in_array($arg, ['having', 'orderBy', 'join'], true);
-        }))->willReturn('')->shouldBeCalled();
-        $queryBuilderProphecy->getMaxResults()->willReturn(42)->shouldBeCalled();
+        $managerRegistryProphecy = $this->prophesize(ManagerRegistry::class);
+        $managerRegistryProphecy->getManagerForClass(Dummy::class)->willReturn($entityManagerProphecy);
+
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
 
         $paginationExtension = new PaginationExtension(
-            $this->prophesize(ManagerRegistry::class)->reveal(),
+            $managerRegistryProphecy->reveal(),
             $requestStack,
             $resourceMetadataFactoryProphecy->reveal()
         );
 
-        $args = [$queryBuilderProphecy->reveal()];
+        $result = $paginationExtension->getResult($queryBuilder);
 
-        if (!$legacy) {
-            $args[] = 'Foo';
-            $args[] = null;
-        }
-
-        return $paginationExtension->getResult(...$args);
+        $this->assertInstanceOf(PartialPaginatorInterface::class, $result);
+        $this->assertInstanceOf(PaginatorInterface::class, $result);
     }
 }

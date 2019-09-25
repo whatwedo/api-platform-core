@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\Bridge\Doctrine\Orm\Filter;
 
+use ApiPlatform\Core\Api\IdentifiersExtractorInterface;
 use ApiPlatform\Core\Api\IriConverterInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Util\QueryNameGenerator;
@@ -21,6 +22,7 @@ use ApiPlatform\Core\Test\DoctrineOrmFilterTestCase;
 use ApiPlatform\Core\Tests\Bridge\Doctrine\Common\Filter\SearchFilterTestTrait;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Serializer\NameConverter\CustomConverter;
 use Doctrine\Common\Persistence\ManagerRegistry;
 use Prophecy\Argument;
 use Symfony\Component\HttpFoundation\Request;
@@ -182,15 +184,15 @@ class SearchFilterTest extends DoctrineOrmFilterTestCase
                 'strategy' => 'exact',
                 'is_collection' => true,
             ],
-            'nameConverted' => [
-                'property' => 'nameConverted',
+            'name_converted' => [
+                'property' => 'name_converted',
                 'type' => 'string',
                 'required' => false,
                 'strategy' => 'exact',
                 'is_collection' => false,
             ],
-            'nameConverted[]' => [
-                'property' => 'nameConverted',
+            'name_converted[]' => [
+                'property' => 'name_converted',
                 'type' => 'string',
                 'required' => false,
                 'strategy' => 'exact',
@@ -329,6 +331,21 @@ class SearchFilterTest extends DoctrineOrmFilterTestCase
         $this->doTestApplyWithAnotherAlias(true);
     }
 
+    /**
+     * @group legacy
+     * @expectedDeprecation Not injecting ItemIdentifiersExtractor is deprecated since API Platform 2.5 and can lead to unexpected behaviors, it will not be possible anymore in API Platform 3.0.
+     */
+    public function testNotPassingIdentifiersExtractor()
+    {
+        $requestStack = new RequestStack();
+        $requestStack->push(Request::create('/api/dummies', 'GET', []));
+        $iriConverterProphecy = $this->prophesize(IriConverterInterface::class);
+        $iriConverter = $iriConverterProphecy->reveal();
+        $propertyAccessor = self::$kernel->getContainer()->get('test.property_accessor');
+
+        return new SearchFilter($this->managerRegistry, $requestStack, $iriConverter, $propertyAccessor, null, null, null);
+    }
+
     private function doTestApplyWithAnotherAlias(bool $request)
     {
         $filters = ['name' => 'exact'];
@@ -391,8 +408,8 @@ class SearchFilterTest extends DoctrineOrmFilterTestCase
                     $filterFactory,
                 ],
                 'invalid values for relations' => [
-                    sprintf('SELECT %s FROM %s %1$s WHERE %1$s.name = :name_p1 AND %1$s.relatedDummy = :relatedDummy_p2', $this->alias, Dummy::class),
-                    ['relatedDummy_p2' => 'foo'],
+                    sprintf('SELECT %s FROM %s %1$s WHERE %1$s.name = :name_p1', $this->alias, Dummy::class),
+                    [],
                     $filterFactory,
                 ],
                 'partial' => [
@@ -436,8 +453,21 @@ class SearchFilterTest extends DoctrineOrmFilterTestCase
                     $filterFactory,
                 ],
                 'invalid value for relation' => [
-                    sprintf('SELECT %s FROM %s %1$s WHERE %1$s.relatedDummy = :relatedDummy_p1', $this->alias, Dummy::class),
-                    ['relatedDummy_p1' => 'exact'],
+                    sprintf('SELECT %s FROM %s %1$s', $this->alias, Dummy::class),
+                    [],
+                    $filterFactory,
+                ],
+                'invalid iri for relation' => [
+                    [
+                        'id' => null,
+                        'name' => null,
+                        'relatedDummy' => null,
+                    ],
+                    [
+                        'relatedDummy' => '/related_dummie/1',
+                    ],
+                    sprintf('SELECT %s FROM %s %1$s', $this->alias, Dummy::class),
+                    [],
                     $filterFactory,
                 ],
                 'IRI value for relation' => [
@@ -483,6 +513,9 @@ class SearchFilterTest extends DoctrineOrmFilterTestCase
         $iriConverter = $iriConverterProphecy->reveal();
         $propertyAccessor = self::$kernel->getContainer()->get('test.property_accessor');
 
-        return new SearchFilter($managerRegistry, $requestStack, $iriConverter, $propertyAccessor, null, $properties);
+        $identifierExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifierExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
+        return new SearchFilter($managerRegistry, $requestStack, $iriConverter, $propertyAccessor, null, $properties, $identifierExtractorProphecy->reveal(), new CustomConverter());
     }
 }

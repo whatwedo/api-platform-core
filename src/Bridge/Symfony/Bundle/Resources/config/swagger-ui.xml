@@ -19,7 +19,7 @@
             <argument>%api_platform.title%</argument>
             <argument>%api_platform.description%</argument>
             <argument>%api_platform.version%</argument>
-            <argument type="service" id="api_platform.formats_provider" />
+            <argument>%api_platform.formats%</argument>
             <argument>%api_platform.oauth.enabled%</argument>
             <argument>%api_platform.oauth.clientId%</argument>
             <argument>%api_platform.oauth.clientSecret%</argument>
@@ -32,6 +32,9 @@
             <argument>%api_platform.enable_swagger_ui%</argument>
             <argument>%api_platform.enable_re_doc%</argument>
             <argument>%api_platform.graphql.enabled%</argument>
+            <argument>%api_platform.graphql.graphiql.enabled%</argument>
+            <argument>%api_platform.graphql.graphql_playground.enabled%</argument>
+            <argument>%api_platform.swagger.versions%</argument>
         </service>
 
     </services>

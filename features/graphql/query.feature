@@ -8,6 +8,7 @@ Feature: GraphQL query support
       dummy(id: "/dummies/1") {
         id
         name
+        name_converted
       }
     }
     """
@@ -16,6 +17,7 @@ Feature: GraphQL query support
     And the header "Content-Type" should be equal to "application/json"
     And the JSON node "data.dummy.id" should be equal to "/dummies/1"
     And the JSON node "data.dummy.name" should be equal to "Dummy #1"
+    And the JSON node "data.dummy.name_converted" should be equal to "Converted 1"
 
   Scenario: Retrieve a Relay Node
     When I send the following GraphQL request:
@@ -23,7 +25,7 @@ Feature: GraphQL query support
     {
       node(id: "/dummies/1") {
         id
-        ... on Dummy {
+        ... on DummyItem {
           name
         }
       }
@@ -279,6 +281,116 @@ Feature: GraphQL query support
       "data": {
         "dummyDtoNoInputs": {
           "edges": []
+        }
+      }
+    }
+    """
+
+  Scenario: Custom not retrieved item query
+    When I send the following GraphQL request:
+    """
+    {
+      testNotRetrievedItemDummyCustomQuery {
+        message
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testNotRetrievedItemDummyCustomQuery": {
+          "message": "Success (not retrieved)!"
+        }
+      }
+    }
+    """
+
+  Scenario: Custom item query with read and serialize set to false
+    When I send the following GraphQL request:
+    """
+    {
+      testNoReadAndSerializeItemDummyCustomQuery(id: "/not_used") {
+        message
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testNoReadAndSerializeItemDummyCustomQuery": null
+      }
+    }
+    """
+
+  Scenario: Custom item query
+    Given there are 2 dummyCustomQuery objects
+    When I send the following GraphQL request:
+    """
+    {
+      testItemDummyCustomQuery(id: "/dummy_custom_queries/1") {
+        message
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testItemDummyCustomQuery": {
+          "message": "Success!"
+        }
+      }
+    }
+    """
+
+  Scenario: Custom item query with custom arguments
+    Given there are 2 dummyCustomQuery objects
+    When I send the following GraphQL request:
+    """
+    {
+      testItemCustomArgumentsDummyCustomQuery(
+        id: "/dummy_custom_queries/1",
+        customArgumentBool: true,
+        customArgumentInt: 3,
+        customArgumentString: "A string",
+        customArgumentFloat: 2.6,
+        customArgumentIntArray: [4],
+        customArgumentCustomType: "2019-05-24T00:00:00+00:00"
+      ) {
+        message
+        customArgs
+      }
+    }
+    """
+    Then the response status code should be 200
+    And the response should be in JSON
+    And the header "Content-Type" should be equal to "application/json"
+    And the JSON should be equal to:
+    """
+    {
+      "data": {
+        "testItemCustomArgumentsDummyCustomQuery": {
+          "message": "Success!",
+          "customArgs": {
+            "id": "/dummy_custom_queries/1",
+            "customArgumentBool": true,
+            "customArgumentInt": 3,
+            "customArgumentString": "A string",
+            "customArgumentFloat": 2.6,
+            "customArgumentIntArray": [4],
+            "customArgumentCustomType": "2019-05-24T00:00:00+00:00"
+          }
         }
       }
     }

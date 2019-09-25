@@ -8,8 +8,6 @@ framework:
     session:
         storage_id:                    'session.storage.mock_file'
     form:                              ~ # For FOSUser
-    templating:
-        engines:                       ['twig'] # For Swagger UI
     profiler:
         enabled:                        true
         collect:                        false
@@ -29,13 +27,6 @@ doctrine:
     orm:
         auto_generate_proxy_classes:   '%kernel.debug%'
         auto_mapping:                  true
-
-doctrine_mongodb:
-    connections:
-        default:                       ~
-    document_managers:
-        default:
-            auto_mapping:              true
 
 twig:
     strict_variables: '%kernel.debug%'
@@ -59,11 +50,15 @@ api_platform:
         xml:                           ['application/xml', 'text/xml']
         json:                          ['application/json']
         html:                          ['text/html']
+        graphql:                       ['application/graphql']
+        multipart:                     ['multipart/form-data']
     error_formats:
         jsonproblem:                   ['application/problem+json']
         jsonld:                        ['application/ld+json']
         jsonapi:                       ['application/vnd.api+json']
-    graphql:                           true
+    graphql:
+        enabled: true
+        nesting_separator: __
     name_converter:                    'app.name_converter'
     enable_fos_user:                   true
     collection:
@@ -91,6 +86,21 @@ parameters:
     container.dumper.inline_class_loader: true
 
 services:
+    test.client:
+        class: ApiPlatform\Core\Tests\Fixtures\TestBundle\BrowserKit\Client
+        shared: false
+        public: true
+        arguments:
+            - '@kernel'
+            - '%test.client.parameters%'
+            - '@test.client.history'
+            - '@test.client.cookiejar'
+
+    ApiPlatform\Core\Tests\Fixtures\TestBundle\MessageHandler\:
+        resource: '../../TestBundle/MessageHandler'
+        autowire: true
+        autoconfigure: true
+
     contain_non_resource.item_data_provider:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataProvider\ContainNonResourceItemDataProvider'
         public: false
@@ -134,6 +144,10 @@ services:
         arguments: ['@doctrine']
         tags: ['api_platform.filter']
 
+    ApiPlatform\Core\Tests\Fixtures\TestBundle\Controller\:
+        resource: '../../TestBundle/Controller'
+        tags: ['controller.service_arguments']
+
     app.config_dummy_resource.action:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\Action\ConfigCustom'
         arguments: ['@api_platform.item_data_provider']
@@ -145,7 +159,7 @@ services:
 
     app.entity.filter.dummy_property.whitelist_property:
         parent:    'api_platform.serializer.property_filter'
-        arguments: [ 'whitelisted_properties', false, [foo] ]
+        arguments: [ 'whitelisted_properties', false, [foo, nameConverted] ]
         tags:      [ { name: 'api_platform.filter', id: 'dummy_property.whitelist_property' } ]
 
     app.entity.filter.dummy_property.whitelist_nested_property:
@@ -227,6 +241,12 @@ services:
         tags:
             -  { name: 'api_platform.data_transformer' }
 
+    app.data_transformer.dummy_dto_no_input_to_output_dto:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\DummyDtoNoInputToOutputDtoDataTransformer'
+        public: false
+        tags:
+            -  { name: 'api_platform.data_transformer' }
+
     app.data_transformer.recover_password_input:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\RecoverPasswordInputDataTransformer'
         public: false
@@ -239,14 +259,68 @@ services:
         tags:
             -  { name: 'api_platform.data_transformer' }
 
-    app.messenger_handler.messenger_with_inputs:
-        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\MessengerHandler\MessengerWithInputHandler'
-        public: false
-        tags:
-            -  { name: 'messenger.message_handler' }
-
     app.messenger_handler.messenger_with_response:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\MessengerHandler\MessengerWithResponseHandler'
         public: false
         tags:
             -  { name: 'messenger.message_handler' }
+
+    app.graphql.query_resolver.dummy_custom_item:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\DummyCustomQueryItemResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.query_resolver' }
+
+    app.graphql.query_resolver.dummy_custom_collection:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\DummyCustomQueryCollectionResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.query_resolver' }
+
+    app.graphql.query_resolver.dummy_custom_collection_no_read_and_serialize:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\DummyCustomQueryNoReadAndSerializeCollectionResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.query_resolver' }
+
+    app.graphql.mutation_resolver.dummy_custom:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\SumMutationResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.mutation_resolver' }
+
+    app.graphql.mutation_resolver.dummy_custom_not_persisted:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\SumNotPersistedMutationResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.mutation_resolver' }
+
+    app.graphql.mutation_resolver.dummy_custom_no_write_custom_result:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\SumNoWriteCustomResultMutationResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.mutation_resolver' }
+
+    app.graphql.mutation_resolver.upload_media_object:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\UploadMediaObjectResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.mutation_resolver' }
+
+    app.graphql.mutation_resolver.upload_multiple_media_object:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Resolver\UploadMultipleMediaObjectResolver'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.mutation_resolver' }
+
+    app.graphql.date_time_type:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Type\Definition\DateTimeType'
+        public: false
+        tags:
+            - { name: 'api_platform.graphql.type' }
+
+    app.graphql.type_converter:
+        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\GraphQl\Type\TypeConverter'
+        decorates: 'api_platform.graphql.type_converter'
+        arguments: ['@app.graphql.type_converter.inner']
+        public: false

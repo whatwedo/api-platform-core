@@ -14,9 +14,12 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\PropertyInfo;
 
 use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Persistence\Mapping\ClassMetadata;
 use Doctrine\Common\Persistence\Mapping\MappingException;
 use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ODM\MongoDB\Mapping\ClassMetadata as MongoDbClassMetadata;
 use Doctrine\ODM\MongoDB\Types\Type as MongoDbType;
+use Symfony\Component\PropertyInfo\PropertyAccessExtractorInterface;
 use Symfony\Component\PropertyInfo\PropertyListExtractorInterface;
 use Symfony\Component\PropertyInfo\PropertyTypeExtractorInterface;
 use Symfony\Component\PropertyInfo\Type;
@@ -29,7 +32,7 @@ use Symfony\Component\PropertyInfo\Type;
  * @author Kévin Dunglas <dunglas@gmail.com>
  * @author Alan Poulain <contact@alanpoulain.eu>
  */
-final class DoctrineExtractor implements PropertyListExtractorInterface, PropertyTypeExtractorInterface
+final class DoctrineExtractor implements PropertyListExtractorInterface, PropertyTypeExtractorInterface, PropertyAccessExtractorInterface
 {
     private $objectManager;
 
@@ -43,9 +46,7 @@ final class DoctrineExtractor implements PropertyListExtractorInterface, Propert
      */
     public function getProperties($class, array $context = [])
     {
-        try {
-            $metadata = $this->objectManager->getClassMetadata($class);
-        } catch (MappingException $exception) {
+        if (null === $metadata = $this->getMetadata($class)) {
             return null;
         }
 
@@ -57,23 +58,15 @@ final class DoctrineExtractor implements PropertyListExtractorInterface, Propert
      */
     public function getTypes($class, $property, array $context = [])
     {
-        try {
-            $metadata = $this->objectManager->getClassMetadata($class);
-        } catch (MappingException $exception) {
+        if (null === $metadata = $this->getMetadata($class)) {
             return null;
         }
-
-        $reflectionMetadata = new \ReflectionClass($metadata);
 
         if ($metadata->hasAssociation($property)) {
             $class = $metadata->getAssociationTargetClass($property);
 
             if ($metadata->isSingleValuedAssociation($property)) {
-                if ($reflectionMetadata->hasMethod('isNullable')) {
-                    $nullable = $metadata->isNullable($property);
-                } else {
-                    $nullable = false;
-                }
+                $nullable = $metadata instanceof MongoDbClassMetadata && $metadata->isNullable($property);
 
                 return [new Type(Type::BUILTIN_TYPE_OBJECT, $nullable, $class)];
             }
@@ -94,7 +87,7 @@ final class DoctrineExtractor implements PropertyListExtractorInterface, Propert
 
         if ($metadata->hasField($property)) {
             $typeOfField = $metadata->getTypeOfField($property);
-            $nullable = $reflectionMetadata->hasMethod('isNullable') && $metadata->isNullable($property);
+            $nullable = $metadata instanceof MongoDbClassMetadata && $metadata->isNullable($property);
 
             switch ($typeOfField) {
                 case MongoDbType::DATE:
@@ -108,6 +101,39 @@ final class DoctrineExtractor implements PropertyListExtractorInterface, Propert
 
                     return $builtinType ? [new Type($builtinType, $nullable)] : null;
             }
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isReadable($class, $property, array $context = []): ?bool
+    {
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isWritable($class, $property, array $context = []): ?bool
+    {
+        if (
+            null === ($metadata = $this->getMetadata($class))
+            || $metadata instanceof MongoDbClassMetadata && MongoDbClassMetadata::GENERATOR_TYPE_NONE === $metadata->generatorType
+            || !\in_array($property, $metadata->getIdentifierFieldNames(), true)
+        ) {
+            return null;
+        }
+
+        return false;
+    }
+
+    private function getMetadata(string $class): ?ClassMetadata
+    {
+        try {
+            return $this->objectManager->getClassMetadata($class);
+        } catch (MappingException $exception) {
+            return null;
         }
     }
 

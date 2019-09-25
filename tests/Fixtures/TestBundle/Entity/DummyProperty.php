@@ -35,7 +35,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
  *         }
  *     },
  *     graphql={
- *         "query",
+ *         "item_query",
+ *         "collection_query",
  *         "update",
  *         "delete",
  *         "create"={
@@ -100,6 +101,15 @@ class DummyProperty
      * @Groups({"dummy_read", "dummy_graphql_read", "dummy_write"})
      */
     public $groups;
+
+    /**
+     * @var string
+     *
+     * @ORM\Column(nullable=true)
+     *
+     * @Groups({"dummy_read"})
+     */
+    public $nameConverted;
 
     /**
      * @return int

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Bridge\Doctrine\Orm;
 
-use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\ContextAwareQueryCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryResultCollectionExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Util\QueryNameGenerator;
@@ -21,7 +20,7 @@ use ApiPlatform\Core\DataProvider\ContextAwareCollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\RestrictedDataProviderInterface;
 use ApiPlatform\Core\Exception\RuntimeException;
 use Doctrine\Common\Persistence\ManagerRegistry;
-use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Collection data provider for the Doctrine ORM.
@@ -36,9 +35,9 @@ class CollectionDataProvider implements ContextAwareCollectionDataProviderInterf
     private $collectionExtensions;
 
     /**
-     * @param QueryCollectionExtensionInterface[]|ContextAwareQueryCollectionExtensionInterface[] $collectionExtensions
+     * @param QueryCollectionExtensionInterface[] $collectionExtensions
      */
-    public function __construct(ManagerRegistry $managerRegistry, /* iterable */ $collectionExtensions = [])
+    public function __construct(ManagerRegistry $managerRegistry, iterable $collectionExtensions = [])
     {
         $this->managerRegistry = $managerRegistry;
         $this->collectionExtensions = $collectionExtensions;
@@ -46,7 +45,7 @@ class CollectionDataProvider implements ContextAwareCollectionDataProviderInterf
 
     public function supports(string $resourceClass, string $operationName = null, array $context = []): bool
     {
-        return null !== $this->managerRegistry->getManagerForClass($resourceClass);
+        return $this->managerRegistry->getManagerForClass($resourceClass) instanceof EntityManagerInterface;
     }
 
     /**
@@ -56,7 +55,7 @@ class CollectionDataProvider implements ContextAwareCollectionDataProviderInterf
      */
     public function getCollection(string $resourceClass, string $operationName = null, array $context = [])
     {
-        /** @var ObjectManager $manager */
+        /** @var EntityManagerInterface $manager */
         $manager = $this->managerRegistry->getManagerForClass($resourceClass);
 
         $repository = $manager->getRepository($resourceClass);

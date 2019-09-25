@@ -25,6 +25,10 @@ use ApiPlatform\Core\Exception\InvalidArgumentException;
  * @Attributes(
  *     @Attribute("accessControl", type="string"),
  *     @Attribute("accessControlMessage", type="string"),
+ *     @Attribute("security", type="string"),
+ *     @Attribute("securityMessage", type="string"),
+ *     @Attribute("securityPostDenormalize", type="string"),
+ *     @Attribute("securityPostDenormalizeMessage", type="string"),
  *     @Attribute("attributes", type="array"),
  *     @Attribute("cacheHeaders", type="array"),
  *     @Attribute("collectionOperations", type="array"),
@@ -41,7 +45,6 @@ use ApiPlatform\Core\Exception\InvalidArgumentException;
  *     @Attribute("input", type="mixed"),
  *     @Attribute("iri", type="string"),
  *     @Attribute("itemOperations", type="array"),
- *     @Attribute("maximumItemsPerPage", type="int"),
  *     @Attribute("mercure", type="mixed"),
  *     @Attribute("messenger", type="mixed"),
  *     @Attribute("normalizationContext", type="array"),
@@ -54,7 +57,10 @@ use ApiPlatform\Core\Exception\InvalidArgumentException;
  *     @Attribute("paginationEnabled", type="bool"),
  *     @Attribute("paginationFetchJoinCollection", type="bool"),
  *     @Attribute("paginationItemsPerPage", type="int"),
+ *     @Attribute("maximumItemsPerPage", type="int"),
+ *     @Attribute("paginationMaximumItemsPerPage", type="int"),
  *     @Attribute("paginationPartial", type="bool"),
+ *     @Attribute("paginationViaCursor", type="array"),
  *     @Attribute("routePrefix", type="string"),
  *     @Attribute("shortName", type="string"),
  *     @Attribute("subresourceOperations", type="array"),
@@ -107,14 +113,28 @@ final class ApiResource
      *
      * @var string
      */
-    private $accessControl;
+    private $security;
 
     /**
      * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
      *
      * @var string
      */
-    private $accessControlMessage;
+    private $securityMessage;
+
+    /**
+     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
+     *
+     * @var string
+     */
+    private $securityPostDenormalize;
+
+    /**
+     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
+     *
+     * @var string
+     */
+    private $securityPostDenormalizeMessage;
 
     /**
      * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
@@ -178,13 +198,6 @@ final class ApiResource
      * @var string[]
      */
     private $hydraContext;
-
-    /**
-     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
-     *
-     * @var int
-     */
-    private $maximumItemsPerPage;
 
     /**
      * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
@@ -260,6 +273,22 @@ final class ApiResource
      * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
      *
      * @var int
+     *
+     * @deprecated - Use $paginationMaximumItemsPerPage instead
+     */
+    private $maximumItemsPerPage;
+
+    /**
+     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
+     *
+     * @var int
+     */
+    private $paginationMaximumItemsPerPage;
+
+    /**
+     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
+     *
+     * @var int
      */
     private $paginationPartial;
 
@@ -311,6 +340,13 @@ final class ApiResource
      * @var array
      */
     private $openapiContext;
+
+    /**
+     * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
+     *
+     * @var array
+     */
+    private $paginationViaCursor;
 
     /**
      * @throws InvalidArgumentException

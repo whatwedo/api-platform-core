@@ -16,9 +16,12 @@ namespace ApiPlatform\Core\Tests\Bridge\Doctrine\MongoDbOdm\Filter;
 use ApiPlatform\Core\Bridge\Doctrine\MongoDbOdm\Filter\OrderFilter;
 use ApiPlatform\Core\Test\DoctrineMongoDbOdmFilterTestCase;
 use ApiPlatform\Core\Tests\Bridge\Doctrine\Common\Filter\OrderFilterTestTrait;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Serializer\NameConverter\CustomConverter;
 use Doctrine\Common\Persistence\ManagerRegistry;
 
 /**
+ * @group mongodb
+ *
  * @author Alan Poulain <contact@alanpoulain.eu>
  */
 class OrderFilterTest extends DoctrineMongoDbOdmFilterTestCase
@@ -36,81 +39,193 @@ class OrderFilterTest extends DoctrineMongoDbOdmFilterTestCase
                 'property' => 'id',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[name]' => [
                 'property' => 'name',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[alias]' => [
                 'property' => 'alias',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[description]' => [
                 'property' => 'description',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[dummy]' => [
                 'property' => 'dummy',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[dummyDate]' => [
                 'property' => 'dummyDate',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[dummyFloat]' => [
                 'property' => 'dummyFloat',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[dummyPrice]' => [
                 'property' => 'dummyPrice',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[jsonData]' => [
                 'property' => 'jsonData',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[arrayData]' => [
                 'property' => 'arrayData',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
-            'order[nameConverted]' => [
-                'property' => 'nameConverted',
+            'order[name_converted]' => [
+                'property' => 'name_converted',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[dummyBoolean]' => [
                 'property' => 'dummyBoolean',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[relatedDummy]' => [
                 'property' => 'relatedDummy',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[relatedDummies]' => [
                 'property' => 'relatedDummies',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[relatedOwnedDummy]' => [
                 'property' => 'relatedOwnedDummy',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
             'order[relatedOwningDummy]' => [
                 'property' => 'relatedOwningDummy',
                 'type' => 'string',
                 'required' => false,
+                'schema' => [
+                    'type' => 'string',
+                    'enum' => [
+                        'asc',
+                        'desc',
+                    ],
+                ],
             ],
         ], $filter->getDescription($this->resourceClass));
     }
@@ -352,6 +467,6 @@ class OrderFilterTest extends DoctrineMongoDbOdmFilterTestCase
 
     protected function buildFilter(?array $properties = null)
     {
-        return new $this->filterClass($this->managerRegistry, 'order', null, $properties);
+        return new $this->filterClass($this->managerRegistry, 'order', null, $properties, new CustomConverter());
     }
 }

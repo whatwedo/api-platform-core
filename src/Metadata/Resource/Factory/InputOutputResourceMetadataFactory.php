@@ -64,6 +64,23 @@ final class InputOutputResourceMetadataFactory implements ResourceMetadataFactor
 
             $operation['input'] = isset($operation['input']) ? $this->transformInputOutput($operation['input']) : $resourceAttributes['input'];
             $operation['output'] = isset($operation['output']) ? $this->transformInputOutput($operation['output']) : $resourceAttributes['output'];
+
+            if (
+                isset($operation['input'])
+                && \array_key_exists('class', $operation['input'])
+                && null === $operation['input']['class']
+            ) {
+                $operation['deserialize'] ?? $operation['deserialize'] = false;
+                $operation['validate'] ?? $operation['validate'] = false;
+            }
+
+            if (
+                isset($operation['output'])
+                && \array_key_exists('class', $operation['output'])
+                && null === $operation['output']['class']
+            ) {
+                $operation['status'] ?? $operation['status'] = 204;
+            }
         }
 
         return $operations;
@@ -83,7 +100,7 @@ final class InputOutputResourceMetadataFactory implements ResourceMetadataFactor
             $attribute = ['class' => $attribute];
         }
 
-        if (!isset($attribute['name'])) {
+        if (!isset($attribute['name']) && isset($attribute['class'])) {
             $attribute['name'] = (new \ReflectionClass($attribute['class']))->getShortName();
         }
 

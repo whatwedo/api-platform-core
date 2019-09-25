@@ -28,6 +28,11 @@ trait ExistsFilterTrait
     use PropertyHelperTrait;
 
     /**
+     * @var string Keyword used to retrieve the value
+     */
+    private $existsParameterName;
+
+    /**
      * {@inheritdoc}
      */
     public function getDescription(string $resourceClass): array
@@ -43,9 +48,9 @@ trait ExistsFilterTrait
             if (!$this->isPropertyMapped($property, $resourceClass, true) || !$this->isNullableField($property, $resourceClass)) {
                 continue;
             }
-
-            $description[sprintf('%s[%s]', $property, self::QUERY_PARAMETER_KEY)] = [
-                'property' => $property,
+            $propertyName = $this->normalizePropertyName($property);
+            $description[sprintf('%s[%s]', $this->existsParameterName, $propertyName)] = [
+                'property' => $propertyName,
                 'type' => 'bool',
                 'required' => false,
             ];
@@ -63,18 +68,28 @@ trait ExistsFilterTrait
 
     abstract protected function getLogger(): LoggerInterface;
 
+    abstract protected function normalizePropertyName($property);
+
     private function normalizeValue($value, string $property): ?bool
     {
-        if (\in_array($value[self::QUERY_PARAMETER_KEY], [true, 'true', '1', '', null], true)) {
+        if (\is_array($value) && isset($value[self::QUERY_PARAMETER_KEY])) {
+            @trigger_error(
+                sprintf('The ExistsFilter syntax "%s[exists]=true/false" is deprecated since 2.5. Use the syntax "%s[%s]=true/false" instead.', $property, $this->existsParameterName, $property),
+                E_USER_DEPRECATED
+            );
+            $value = $value[self::QUERY_PARAMETER_KEY];
+        }
+
+        if (\in_array($value, [true, 'true', '1', '', null], true)) {
             return true;
         }
 
-        if (\in_array($value[self::QUERY_PARAMETER_KEY], [false, 'false', '0'], true)) {
+        if (\in_array($value, [false, 'false', '0'], true)) {
             return false;
         }
 
         $this->getLogger()->notice('Invalid filter ignored', [
-            'exception' => new InvalidArgumentException(sprintf('Invalid value for "%s[%s]", expected one of ( "%s" )', $property, self::QUERY_PARAMETER_KEY, implode('" | "', [
+            'exception' => new InvalidArgumentException(sprintf('Invalid value for "%s[%s]", expected one of ( "%s" )', $this->existsParameterName, $property, implode('" | "', [
                 'true',
                 'false',
                 '1',

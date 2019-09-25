@@ -15,12 +15,15 @@ namespace ApiPlatform\Core\Tests\EventListener;
 
 use ApiPlatform\Core\Api\FormatsProviderInterface;
 use ApiPlatform\Core\EventListener\DeserializeListener;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
+use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
 use ApiPlatform\Core\Serializer\SerializerContextBuilderInterface;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
-use Symfony\Component\HttpKernel\Exception\NotAcceptableHttpException;
+use Symfony\Component\HttpKernel\Exception\UnsupportedMediaTypeHttpException;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\Serializer\SerializerInterface;
 
@@ -29,9 +32,9 @@ use Symfony\Component\Serializer\SerializerInterface;
  */
 class DeserializeListenerTest extends TestCase
 {
-    public const FORMATS = ['json' => ['application/json']];
+    private const FORMATS = ['json' => ['application/json']];
 
-    public function testDoNotCallWhenRequestMethodIsSafe()
+    public function testDoNotCallWhenRequestMethodIsSafe(): void
     {
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
 
@@ -40,49 +43,19 @@ class DeserializeListenerTest extends TestCase
         $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
 
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->shouldNotBeCalled();
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->shouldNotBeCalled();
+        $resourceMetadataFactory = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactory->create()->shouldNotBeCalled();
 
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactory->reveal());
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    /**
-     * @dataProvider allowedEmptyRequestMethodsProvider
-     */
-    public function testDoNotCallWhenSendingAndEmptyRequestContent($method)
-    {
-        $eventProphecy = $this->prophesize(GetResponseEvent::class);
-
-        $request = new Request([], [], ['data' => new \stdClass(), '_api_resource_class' => 'Foo', '_api_item_operation_name' => 'put'], [], [], [], '');
-        $request->setMethod($method);
-        $request->headers->set('Content-Type', 'application/json');
-        $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
-
-        $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
-
-        $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->shouldNotBeCalled();
-
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->shouldNotBeCalled();
-
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
-        $listener->onKernelRequest($eventProphecy->reveal());
-    }
-
-    public function allowedEmptyRequestMethodsProvider()
-    {
-        return [['PUT'], ['POST']];
-    }
-
-    public function testDoNotCallWhenRequestNotManaged()
+    public function testDoNotCallWhenRequestNotManaged(): void
     {
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
 
@@ -91,94 +64,93 @@ class DeserializeListenerTest extends TestCase
         $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
 
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->shouldNotBeCalled();
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->shouldNotBeCalled();
+        $resourceMetadataFactory = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactory->create()->shouldNotBeCalled();
 
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactory->reveal());
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function testDoNotCallWhenReceiveFlagIsFalse()
+    public function testDoNotDeserializeWhenReceiveFlagIsFalse(): void
     {
-        $eventProphecy = $this->prophesize(GetResponseEvent::class);
-
-        $request = new Request([], [], ['data' => new \stdClass(), '_api_resource_class' => 'Foo', '_api_collection_operation_name' => 'post', '_api_receive' => false]);
-        $request->setMethod('POST');
-        $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
-
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->shouldNotBeCalled();
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->shouldNotBeCalled();
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create()->shouldNotBeCalled();
 
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
+        $request = new Request([], [], ['data' => new Dummy(), '_api_resource_class' => Dummy::class, '_api_collection_operation_name' => 'post', '_api_receive' => false]);
+        $request->setMethod('POST');
+
+        $eventProphecy = $this->prophesize(GetResponseEvent::class);
+        $eventProphecy->getRequest()->willReturn($request);
+
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactoryProphecy->reveal());
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function testDoNotCallWhenInputClassDisabled()
+    public function testDoNotDeserializeWhenDisabledInOperationAttribute(): void
     {
-        $eventProphecy = $this->prophesize(GetResponseEvent::class);
-
-        $request = new Request([], [], ['data' => new \stdClass(), '_api_resource_class' => 'Foo', '_api_collection_operation_name' => 'post'], [], [], [], 'content');
-        $request->setMethod('POST');
-        $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
-
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => null], 'output' => ['class' => null]]);
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->shouldNotBeCalled();
+        $resourceMetadata = new ResourceMetadata('Dummy', null, null, [], [
+            'post' => [
+                'deserialize' => false,
+            ],
+        ]);
 
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn($resourceMetadata);
+
+        $request = new Request([], [], ['data' => new Dummy(), '_api_resource_class' => Dummy::class, '_api_collection_operation_name' => 'post']);
+        $request->setMethod('POST');
+
+        $eventProphecy = $this->prophesize(GetResponseEvent::class);
+        $eventProphecy->getRequest()->willReturn($request);
+
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactoryProphecy->reveal());
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
     /**
      * @dataProvider methodProvider
      */
-    public function testDeserialize(string $method, bool $populateObject)
+    public function testDeserialize(string $method, bool $populateObject): void
     {
-        $result = $populateObject ? new \stdClass() : null;
-        $eventProphecy = $this->prophesize(GetResponseEvent::class);
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(
+            null,
+            null,
+            null,
+            ['put' => ['input_formats' => self::FORMATS]],
+            ['post' => ['input_formats' => self::FORMATS]]
+        ));
 
-        $request = new Request([], [], ['data' => $result, '_api_resource_class' => 'Foo', '_api_collection_operation_name' => 'post'], [], [], [], '{}');
-        $request->setMethod($method);
-        $request->headers->set('Content-Type', 'application/json');
-        $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
+        $this->doTestDeserialize($method, $populateObject, $resourceMetadataFactoryProphecy->reveal());
+    }
 
-        $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $context = $populateObject ? [AbstractNormalizer::OBJECT_TO_POPULATE => $populateObject] : [];
-        $context['input'] = ['class' => 'Foo'];
-        $context['output'] = ['class' => 'Foo'];
-        $context['resource_class'] = 'Foo';
-        $serializerProphecy->deserialize('{}', 'Foo', 'json', $context)->willReturn($result)->shouldBeCalled();
-
+    /**
+     * @dataProvider methodProvider
+     */
+    public function legacyTestDeserialize(string $method, bool $populateObject): void
+    {
         $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
         $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->willReturn(self::FORMATS)->shouldBeCalled();
 
-        $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => 'Foo'], 'output' => ['class' => 'Foo'], 'resource_class' => 'Foo'])->shouldBeCalled();
-
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
-        $listener->onKernelRequest($eventProphecy->reveal());
+        $this->doTestDeserialize($method, $populateObject, $formatsProviderProphecy->reveal());
     }
 
-    /**
-     * @dataProvider methodProvider
-     */
-    public function testDeserializeResourceClassSupportedFormat(string $method, bool $populateObject)
+    private function doTestDeserialize(string $method, bool $populateObject, $resourceMetadataFactory): void
     {
         $result = $populateObject ? new \stdClass() : null;
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
@@ -198,6 +170,32 @@ class DeserializeListenerTest extends TestCase
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => 'Foo'], 'output' => ['class' => 'Foo'], 'resource_class' => 'Foo'])->shouldBeCalled();
 
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactory);
+        $listener->onKernelRequest($eventProphecy->reveal());
+    }
+
+    /**
+     * @dataProvider methodProvider
+     */
+    public function testDeserializeResourceClassSupportedFormat(string $method, bool $populateObject): void
+    {
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(
+            null,
+            null,
+            null,
+            null,
+            ['post' => ['input_formats' => self::FORMATS]]
+        ));
+
+        $this->doTestDeserializeResourceClassSupportedFormat($method, $populateObject, $resourceMetadataFactoryProphecy->reveal());
+    }
+
+    /**
+     * @dataProvider methodProvider
+     */
+    public function testLegacyDeserializeResourceClassSupportedFormat(string $method, bool $populateObject): void
+    {
         $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
         $formatsProviderProphecy->getFormatsFromAttributes([
             'resource_class' => 'Foo',
@@ -207,17 +205,63 @@ class DeserializeListenerTest extends TestCase
             'persist' => true,
         ])->willReturn(self::FORMATS)->shouldBeCalled();
 
-        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $formatsProviderProphecy->reveal());
+        $this->doTestDeserializeResourceClassSupportedFormat($method, $populateObject, $formatsProviderProphecy->reveal());
+    }
+
+    private function doTestDeserializeResourceClassSupportedFormat(string $method, bool $populateObject, $resourceMetadataFactory): void
+    {
+        $result = $populateObject ? new \stdClass() : null;
+        $eventProphecy = $this->prophesize(GetResponseEvent::class);
+
+        $request = new Request([], [], ['data' => $result, '_api_resource_class' => 'Foo', '_api_collection_operation_name' => 'post'], [], [], [], '{}');
+        $request->setMethod($method);
+        $request->headers->set('Content-Type', 'application/json');
+        $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
+
+        $serializerProphecy = $this->prophesize(SerializerInterface::class);
+        $context = $populateObject ? [AbstractNormalizer::OBJECT_TO_POPULATE => $populateObject] : [];
+        $context['input'] = ['class' => 'Foo'];
+        $context['output'] = ['class' => 'Foo'];
+        $context['resource_class'] = 'Foo';
+        $serializerProphecy->deserialize('{}', 'Foo', 'json', $context)->willReturn($result)->shouldBeCalled();
+
+        $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
+        $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => 'Foo'], 'output' => ['class' => 'Foo'], 'resource_class' => 'Foo'])->shouldBeCalled();
+
+        $listener = new DeserializeListener($serializerProphecy->reveal(), $serializerContextBuilderProphecy->reveal(), $resourceMetadataFactory);
 
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function methodProvider()
+    public function methodProvider(): iterable
     {
-        return [['POST', false], ['PUT', true]];
+        yield ['POST', false];
+        yield ['PUT', true];
     }
 
-    public function testContentNegotiation()
+    public function testContentNegotiation(): void
+    {
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(
+            null,
+            null,
+            null,
+            null,
+            ['post' => ['input_formats' => ['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']]]]
+        ));
+
+        $this->doTestContentNegotiation($resourceMetadataFactoryProphecy->reveal());
+    }
+
+    public function testLegacyContentNegotiation(): void
+    {
+        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
+        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->willReturn(['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']])->shouldBeCalled();
+
+        $this->doTestContentNegotiation($formatsProviderProphecy->reveal());
+    }
+
+    private function doTestContentNegotiation($resourceMetadataFactory): void
     {
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
 
@@ -235,20 +279,17 @@ class DeserializeListenerTest extends TestCase
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn($context)->shouldBeCalled();
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->willReturn(['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']])->shouldBeCalled();
-
         $listener = new DeserializeListener(
             $serializerProphecy->reveal(),
             $serializerContextBuilderProphecy->reveal(),
-            $formatsProviderProphecy->reveal()
+            $resourceMetadataFactory
         );
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function testNotSupportedContentType()
+    public function testNotSupportedContentType(): void
     {
-        $this->expectException(NotAcceptableHttpException::class);
+        $this->expectException(UnsupportedMediaTypeHttpException::class);
         $this->expectExceptionMessage('The content-type "application/rdf+xml" is not supported. Supported MIME types are "application/ld+json", "text/xml".');
 
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
@@ -260,25 +301,31 @@ class DeserializeListenerTest extends TestCase
         $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
 
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => 'Foo'], 'output' => ['class' => 'Foo']]);
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->willReturn(['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']])->shouldBeCalled();
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(
+            null,
+            null,
+            null,
+            null,
+            ['post' => ['input_formats' => ['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']]]]
+        ));
 
         $listener = new DeserializeListener(
             $serializerProphecy->reveal(),
             $serializerContextBuilderProphecy->reveal(),
-            $formatsProviderProphecy->reveal()
+            $resourceMetadataFactoryProphecy->reveal()
         );
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function testNoContentType()
+    public function testNoContentType(): void
     {
-        $this->expectException(NotAcceptableHttpException::class);
+        $this->expectException(UnsupportedMediaTypeHttpException::class);
         $this->expectExceptionMessage('The "Content-Type" header must exist.');
 
         $eventProphecy = $this->prophesize(GetResponseEvent::class);
@@ -289,51 +336,31 @@ class DeserializeListenerTest extends TestCase
         $eventProphecy->getRequest()->willReturn($request)->shouldBeCalled();
 
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
+        $serializerProphecy->deserialize(Argument::cetera())->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
         $serializerContextBuilderProphecy->createFromRequest(Argument::type(Request::class), false, Argument::type('array'))->willReturn(['input' => ['class' => 'Foo'], 'output' => ['class' => 'Foo']]);
 
-        $formatsProviderProphecy = $this->prophesize(FormatsProviderInterface::class);
-        $formatsProviderProphecy->getFormatsFromAttributes(Argument::type('array'))->willReturn(['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']])->shouldBeCalled();
+        $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
+        $resourceMetadataFactoryProphecy->create('Foo')->willReturn(new ResourceMetadata(null, null, null, null, null, ['formats' => ['jsonld' => ['application/ld+json'], 'xml' => ['text/xml']]]));
 
         $listener = new DeserializeListener(
             $serializerProphecy->reveal(),
             $serializerContextBuilderProphecy->reveal(),
-            $formatsProviderProphecy->reveal()
+            $resourceMetadataFactoryProphecy->reveal()
         );
         $listener->onKernelRequest($eventProphecy->reveal());
     }
 
-    public function testBadFormatsProviderParameterThrowsException()
-    {
-        $this->expectException(\ApiPlatform\Core\Exception\InvalidArgumentException::class);
-        $this->expectExceptionMessage('The "$formatsProvider" argument is expected to be an implementation of the "ApiPlatform\\Core\\Api\\FormatsProviderInterface" interface.');
-
-        $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
-
-        $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest()->shouldNotBeCalled();
-
-        new DeserializeListener(
-            $serializerProphecy->reveal(),
-            $serializerContextBuilderProphecy->reveal(),
-            'foo'
-        );
-    }
-
     /**
      * @group legacy
-     * @expectedDeprecation Using an array as formats provider is deprecated since API Platform 2.3 and will not be possible anymore in API Platform 3
+     * @expectedDeprecation Passing an array or an instance of "ApiPlatform\Core\Api\FormatsProviderInterface" as 3rd parameter of the constructor of "ApiPlatform\Core\EventListener\DeserializeListener" is deprecated since API Platform 2.5, pass an instance of "ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface" instead
      */
-    public function testLegacyFormatsParameter()
+    public function testLegacyFormatsParameter(): void
     {
         $serializerProphecy = $this->prophesize(SerializerInterface::class);
-        $serializerProphecy->deserialize()->shouldNotBeCalled();
 
         $serializerContextBuilderProphecy = $this->prophesize(SerializerContextBuilderInterface::class);
-        $serializerContextBuilderProphecy->createFromRequest()->shouldNotBeCalled();
 
         new DeserializeListener(
             $serializerProphecy->reveal(),

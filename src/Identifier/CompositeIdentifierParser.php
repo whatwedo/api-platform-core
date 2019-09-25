@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\Identifier;
 
 /**
- * Normalizes a composite identifer.
+ * Normalizes a composite identifier.
  *
  * @author Antoine Bluchet <soyuka@gmail.com>
  */
@@ -33,7 +33,7 @@ final class CompositeIdentifierParser
     {
         $matches = [];
         $identifiers = [];
-        $num = preg_match_all('/(\w+)=(?<=\w=)(.+?)(?=;\w+=)|(\w+)=([^;]+);?$/', $identifier, $matches, PREG_SET_ORDER);
+        $num = preg_match_all('/(\w+)=(?<=\w=)(.*?)(?=;\w+=)|(\w+)=([^;]*);?$/', $identifier, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $i => $match) {
             if ($i === $num - 1) {

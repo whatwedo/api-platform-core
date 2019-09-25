@@ -63,14 +63,16 @@ final class AddHeadersListener
         }
 
         if ($this->etag && !$response->getEtag()) {
-            $response->setEtag(md5($response->getContent()));
+            $response->setEtag(md5((string) $response->getContent()));
         }
 
         if (null !== ($maxAge = $resourceCacheHeaders['max_age'] ?? $this->maxAge) && !$response->headers->hasCacheControlDirective('max-age')) {
             $response->setMaxAge($maxAge);
         }
 
-        if (null !== $this->vary) {
+        if (isset($resourceCacheHeaders['vary'])) {
+            $response->setVary($resourceCacheHeaders['vary']);
+        } elseif (null !== $this->vary) {
             $response->setVary(array_diff($this->vary, $response->getVary()), false);
         }
 

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\Hal\Serializer;
 
 use ApiPlatform\Core\Serializer\AbstractItemNormalizer;
+use ApiPlatform\Core\Serializer\CacheKeyTrait;
 use ApiPlatform\Core\Serializer\ContextTrait;
 use ApiPlatform\Core\Util\ClassInfoTrait;
 use Symfony\Component\Serializer\Exception\LogicException;
@@ -27,8 +28,9 @@ use Symfony\Component\Serializer\Mapping\AttributeMetadataInterface;
  */
 final class ItemNormalizer extends AbstractItemNormalizer
 {
-    use ContextTrait;
+    use CacheKeyTrait;
     use ClassInfoTrait;
+    use ContextTrait;
 
     public const FORMAT = 'jsonhal';
 
@@ -38,9 +40,9 @@ final class ItemNormalizer extends AbstractItemNormalizer
     /**
      * {@inheritdoc}
      */
-    public function supportsNormalization($data, $format = null, array $context = [])
+    public function supportsNormalization($data, $format = null): bool
     {
-        return self::FORMAT === $format && parent::supportsNormalization($data, $format, $context);
+        return self::FORMAT === $format && parent::supportsNormalization($data, $format);
     }
 
     /**
@@ -48,70 +50,46 @@ final class ItemNormalizer extends AbstractItemNormalizer
      */
     public function normalize($object, $format = null, array $context = [])
     {
-        if (!$this->handleNonResource && null !== $outputClass = $this->getOutputClass($this->getObjectClass($object), $context)) {
+        if (null !== $this->getOutputClass($this->getObjectClass($object), $context)) {
             return parent::normalize($object, $format, $context);
         }
 
         if (!isset($context['cache_key'])) {
-            $context['cache_key'] = $this->getHalCacheKey($format, $context);
+            $context['cache_key'] = $this->getCacheKey($format, $context);
         }
 
-        if ($this->handleNonResource) {
-            if (isset($context['api_resource'])) {
-                $originalResource = $context['api_resource'];
-                unset($context['api_resource']);
-            }
-
-            $rawData = parent::normalize($object, $format, $context);
-            if (!\is_array($rawData)) {
-                return $rawData;
-            }
-
-            if (!isset($originalResource)) {
-                return $rawData;
-            }
-
-            $metadataData = [
-                '_links' => [
-                    'self' => [
-                        'href' => $this->iriConverter->getIriFromItem($originalResource),
-                    ],
-                ],
-            ];
-
-            return $metadataData + $rawData;
-        }
-
-        $resourceClass = $this->resourceClassResolver->getResourceClass($object, $context['resource_class'] ?? null, true);
+        $resourceClass = $this->resourceClassResolver->getResourceClass($object, $context['resource_class'] ?? null);
         $context = $this->initContext($resourceClass, $context);
-        $context['iri'] = $this->iriConverter->getIriFromItem($object);
+        $iri = $this->iriConverter->getIriFromItem($object);
+        $context['iri'] = $iri;
         $context['api_normalize'] = true;
 
-        $rawData = parent::normalize($object, $format, $context);
-        if (!\is_array($rawData)) {
-            return $rawData;
+        $data = parent::normalize($object, $format, $context);
+        if (!\is_array($data)) {
+            return $data;
         }
 
-        $metadataData = [
+        $metadata = [
             '_links' => [
                 'self' => [
-                    'href' => $context['iri'],
+                    'href' => $iri,
                 ],
             ],
         ];
         $components = $this->getComponents($object, $format, $context);
-        $metadataData = $this->populateRelation($metadataData, $object, $format, $context, $components, 'links');
-        $metadataData = $this->populateRelation($metadataData, $object, $format, $context, $components, 'embedded');
+        $metadata = $this->populateRelation($metadata, $object, $format, $context, $components, 'links');
+        $metadata = $this->populateRelation($metadata, $object, $format, $context, $components, 'embedded');
 
-        return $metadataData + $rawData;
+        return $metadata + $data;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function supportsDenormalization($data, $type, $format = null, array $context = [])
+    public function supportsDenormalization($data, $type, $format = null): bool
     {
-        return false;
+        // prevent the use of lower priority normalizers (e.g. serializer.normalizer.object) for this format
+        return self::FORMAT === $format;
     }
 
     /**
@@ -127,7 +105,7 @@ final class ItemNormalizer extends AbstractItemNormalizer
     /**
      * {@inheritdoc}
      */
-    protected function getAttributes($object, $format = null, array $context)
+    protected function getAttributes($object, $format = null, array $context): array
     {
         return $this->getComponents($object, $format, $context)['states'];
     }
@@ -255,21 +233,6 @@ final class ItemNormalizer extends AbstractItemNormalizer
         }
 
         return \is_string($rel) ? $rel : $rel['_links']['self']['href'];
-    }
-
-    /**
-     * Gets the cache key to use.
-     *
-     * @return bool|string
-     */
-    private function getHalCacheKey(?string $format, array $context)
-    {
-        try {
-            return md5($format.serialize($context));
-        } catch (\Exception $exception) {
-            // The context cannot be serialized, skip the cache
-            return false;
-        }
     }
 
     /**

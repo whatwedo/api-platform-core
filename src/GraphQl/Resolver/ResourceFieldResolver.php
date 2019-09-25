@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\GraphQl\Resolver;
 
 use ApiPlatform\Core\Api\IriConverterInterface;
-use ApiPlatform\Core\Api\ResourceClassResolverInterface;
 use ApiPlatform\Core\GraphQl\Serializer\ItemNormalizer;
 use ApiPlatform\Core\Util\ClassInfoTrait;
 use GraphQL\Type\Definition\ResolveInfo;
@@ -31,18 +30,16 @@ final class ResourceFieldResolver
     use ClassInfoTrait;
 
     private $iriConverter;
-    private $resourceClassResolver;
 
-    public function __construct(IriConverterInterface $iriConverter, ResourceClassResolverInterface $resourceClassResolver)
+    public function __construct(IriConverterInterface $iriConverter)
     {
         $this->iriConverter = $iriConverter;
-        $this->resourceClassResolver = $resourceClassResolver;
     }
 
-    public function __invoke($source, $args, $context, ResolveInfo $info)
+    public function __invoke(?array $source, array $args, $context, ResolveInfo $info)
     {
         $property = null;
-        if ('id' === $info->fieldName && isset($source[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY], $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY])) {
+        if ('id' === $info->fieldName && !isset($source['_id']) && isset($source[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY], $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY])) {
             return $this->iriConverter->getItemIriFromResourceClass($source[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY], $source[ItemNormalizer::ITEM_IDENTIFIERS_KEY]);
         }
 

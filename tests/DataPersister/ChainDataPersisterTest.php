@@ -24,7 +24,7 @@ use Prophecy\Argument;
  */
 class ChainDataPersisterTest extends TestCase
 {
-    public function testContruct()
+    public function testConstruct()
     {
         $this->assertInstanceOf(DataPersisterInterface::class, new ChainDataPersister([$this->prophesize(DataPersisterInterface::class)->reveal()]));
     }
