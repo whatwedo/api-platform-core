@@ -109,6 +109,16 @@ final class ApiResource
     public $graphql;
 
     /**
+     * @var bool
+     */
+    public $isInterface;
+
+    /**
+     * @var string
+     */
+    public $implements;
+
+    /**
      * @see https://github.com/Haehnchen/idea-php-annotation-plugin/issues/112
      *
      * @var string
