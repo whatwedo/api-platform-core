@@ -72,7 +72,7 @@ final class SchemaBuilder implements SchemaBuilderInterface
                     continue;
                 }
 
-                if ($resourceMetadata->getInterface()) {
+                if ($resourceMetadata->isInterface()) {
                     continue;
                 }
 

@@ -20,6 +20,7 @@ use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type as GraphQLType;
+use GraphQL\Type\Definition\WrappingType;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\PropertyInfo\Type;
 
@@ -68,7 +69,7 @@ final class TypeBuilder implements TypeBuilderInterface
             $shortName .= 'Payload';
         }
 
-        if ($resourceMetadata->getInterface()) {
+        if ($resourceMetadata->isInterface()) {
             $shortName .= self::INTERFACE_POSTFIX;
         }
 
@@ -99,7 +100,7 @@ final class TypeBuilder implements TypeBuilderInterface
             return $resourceObjectType;
         }
 
-        $resourceObjectType = $resourceMetadata->getInterface()
+        $resourceObjectType = $resourceMetadata->isInterface()
             ? $this->buildResourceInterfaceType($resourceClass, $shortName, $resourceMetadata, $input, $queryName, $mutationName, $wrapped, $depth)
             : $this->buildResourceObjectType($resourceClass, $shortName, $resourceMetadata, $input, $queryName, $mutationName, $wrapped, $depth);
         $this->typesContainer->set($shortName, $resourceObjectType);
@@ -297,12 +298,16 @@ final class TypeBuilder implements TypeBuilderInterface
                 }
 
                 foreach ($type->config['interfaces'] as $interface) {
-                    if ($interface === $info->returnType) {
+                    $returnType = $info->returnType instanceof WrappingType
+                        ? $info->returnType->getWrappedType()
+                        : $info->returnType;
+
+                    if ($interface === $returnType) {
                         return $type;
                     }
                 }
 
-                throw new \UnexpectedValueException("Type \"$type\" must implement interface $info->returnType");
+                throw new \UnexpectedValueException("Type \"$type\" must implement interface \"$info->returnType\"");
             },
         ]);
 

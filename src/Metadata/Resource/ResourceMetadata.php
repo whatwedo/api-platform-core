@@ -93,7 +93,7 @@ final class ResourceMetadata
         return $this->iri;
     }
 
-    public function getInterface(): ?bool
+    public function isInterface(): ?bool
     {
         return $this->interface;
     }
