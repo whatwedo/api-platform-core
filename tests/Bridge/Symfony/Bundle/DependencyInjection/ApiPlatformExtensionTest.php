@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\Bridge\Symfony\Bundle\DependencyInjection;
 
+use ApiPlatform\Core\Action\NotFoundAction;
 use ApiPlatform\Core\Api\FilterInterface;
 use ApiPlatform\Core\Api\IdentifiersExtractorInterface;
 use ApiPlatform\Core\Api\IriConverterInterface;
@@ -57,6 +58,7 @@ use ApiPlatform\Core\Bridge\Symfony\Bundle\DependencyInjection\ApiPlatformExtens
 use ApiPlatform\Core\DataPersister\DataPersisterInterface;
 use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
+use ApiPlatform\Core\DataProvider\Pagination;
 use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
 use ApiPlatform\Core\DataTransformer\DataTransformerInterface;
 use ApiPlatform\Core\Exception\FilterValidationException;
@@ -355,6 +357,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->setDefinition('api_platform.graphql.normalizer.object', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.graphql.serializer.context_builder', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.graphql.iterable_type', Argument::type(Definition::class))->shouldNotBeCalled();
+        $containerBuilderProphecy->setDefinition('api_platform.graphql.upload_type', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.graphql.type_locator', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.graphql.types_container', Argument::type(Definition::class))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.graphql.types_factory', Argument::type(Definition::class))->shouldNotBeCalled();
@@ -366,6 +369,8 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->setParameter('api_platform.graphql.enabled', false)->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.default_ide', 'graphiql')->shouldNotBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.default_ide', Argument::any())->shouldNotBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.graphql.nesting_separator', '_')->shouldNotBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.graphql.nesting_separator', Argument::any())->shouldNotBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.collection.pagination', ['enabled' => true])->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.graphiql.enabled', true)->shouldNotBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.graphql.graphiql.enabled', false)->shouldBeCalled();
@@ -614,9 +619,9 @@ class ApiPlatformExtensionTest extends TestCase
     {
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
         $containerBuilderProphecy->registerForAutoconfiguration(AggregationItemExtensionInterface::class)->shouldNotBeCalled();
-        $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.item')->shouldNotBeCalled();
+        $this->childDefinitionProphecy->addTag('api_platform.doctrine_mongodb.odm.aggregation_extension.item')->shouldNotBeCalled();
         $containerBuilderProphecy->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)->shouldNotBeCalled();
-        $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection')->shouldNotBeCalled();
+        $this->childDefinitionProphecy->addTag('api_platform.doctrine_mongodb.odm.aggregation_extension.collection')->shouldNotBeCalled();
         $containerBuilderProphecy->registerForAutoconfiguration(DoctrineMongoDbOdmAbstractFilter::class)->shouldNotBeCalled();
         $this->childDefinitionProphecy->setBindings(Argument::allOf(Argument::withEntry('$managerRegistry', Argument::type(Reference::class))))->shouldNotBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.doctrine_mongodb.odm.aggregation_extension.filter', Argument::type(Definition::class))->shouldNotBeCalled();
@@ -839,6 +844,7 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.action.documentation',
             'api_platform.action.entrypoint',
             'api_platform.action.exception',
+            'api_platform.action.not_found',
             'api_platform.action.placeholder',
             'api_platform.cache.identifiers_extractor',
             'api_platform.cache.metadata.property',
@@ -934,22 +940,24 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.property_accessor' => 'property_accessor',
             'api_platform.property_info' => 'property_info',
             'api_platform.serializer' => 'serializer',
-            IriConverterInterface::class => 'api_platform.iri_converter',
-            UrlGeneratorInterface::class => 'api_platform.router',
-            SerializerContextBuilderInterface::class => 'api_platform.serializer.context_builder',
             CollectionDataProviderInterface::class => 'api_platform.collection_data_provider',
-            ItemDataProviderInterface::class => 'api_platform.item_data_provider',
-            SubresourceDataProviderInterface::class => 'api_platform.subresource_data_provider',
             DataPersisterInterface::class => 'api_platform.data_persister',
-            ResourceNameCollectionFactoryInterface::class => 'api_platform.metadata.resource.name_collection_factory',
-            ResourceMetadataFactoryInterface::class => 'api_platform.metadata.resource.metadata_factory',
+            GroupFilter::class => 'api_platform.serializer.group_filter',
+            IdentifiersExtractorInterface::class => 'api_platform.identifiers_extractor.cached',
+            IriConverterInterface::class => 'api_platform.iri_converter',
+            ItemDataProviderInterface::class => 'api_platform.item_data_provider',
+            NotFoundAction::class => 'api_platform.action.not_found',
+            OperationAwareFormatsProviderInterface::class => 'api_platform.formats_provider',
+            Pagination::class => 'api_platform.pagination',
+            PropertyFilter::class => 'api_platform.serializer.property_filter',
             PropertyNameCollectionFactoryInterface::class => 'api_platform.metadata.property.name_collection_factory',
             PropertyMetadataFactoryInterface::class => 'api_platform.metadata.property.metadata_factory',
             ResourceClassResolverInterface::class => 'api_platform.resource_class_resolver',
-            PropertyFilter::class => 'api_platform.serializer.property_filter',
-            GroupFilter::class => 'api_platform.serializer.group_filter',
-            OperationAwareFormatsProviderInterface::class => 'api_platform.formats_provider',
-            IdentifiersExtractorInterface::class => 'api_platform.identifiers_extractor.cached',
+            ResourceNameCollectionFactoryInterface::class => 'api_platform.metadata.resource.name_collection_factory',
+            ResourceMetadataFactoryInterface::class => 'api_platform.metadata.resource.metadata_factory',
+            SerializerContextBuilderInterface::class => 'api_platform.serializer.context_builder',
+            SubresourceDataProviderInterface::class => 'api_platform.subresource_data_provider',
+            UrlGeneratorInterface::class => 'api_platform.router',
         ];
 
         foreach ($aliases as $alias => $service) {
@@ -1029,11 +1037,11 @@ class ApiPlatformExtensionTest extends TestCase
         if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
             $containerBuilderProphecy->registerForAutoconfiguration(AggregationItemExtensionInterface::class)
                 ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-            $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.item')->shouldBeCalledTimes(1);
+            $this->childDefinitionProphecy->addTag('api_platform.doctrine_mongodb.odm.aggregation_extension.item')->shouldBeCalledTimes(1);
 
             $containerBuilderProphecy->registerForAutoconfiguration(AggregationCollectionExtensionInterface::class)
                 ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-            $this->childDefinitionProphecy->addTag('api_platform.doctrine.mongodb.aggregation_extension.collection')->shouldBeCalledTimes(1);
+            $this->childDefinitionProphecy->addTag('api_platform.doctrine_mongodb.odm.aggregation_extension.collection')->shouldBeCalledTimes(1);
 
             $containerBuilderProphecy->registerForAutoconfiguration(DoctrineMongoDbOdmAbstractFilter::class)
                 ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
@@ -1061,6 +1069,7 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.enable_re_doc' => true,
             'api_platform.graphql.enabled' => true,
             'api_platform.graphql.default_ide' => 'graphiql',
+            'api_platform.graphql.nesting_separator' => '_',
             'api_platform.graphql.collection.pagination' => ['enabled' => true],
             'api_platform.graphql.graphiql.enabled' => true,
             'api_platform.graphql.graphql_playground.enabled' => true,
@@ -1124,6 +1133,7 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.graphql.resolver.stage.validate',
             'api_platform.graphql.resolver.resource_field',
             'api_platform.graphql.iterable_type',
+            'api_platform.graphql.upload_type',
             'api_platform.graphql.type_locator',
             'api_platform.graphql.types_container',
             'api_platform.graphql.types_factory',
