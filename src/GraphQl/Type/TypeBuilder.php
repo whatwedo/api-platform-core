@@ -275,12 +275,19 @@ final class TypeBuilder implements TypeBuilderInterface
         }
 
         $fieldsBuilder = $fieldsBuilder ?? $this->fieldsBuilderLocator->get('api_platform.graphql.fields_builder');
-        $fields = $fieldsBuilder->getResourceObjectTypeFields($resourceClass, $resourceMetadata, false, $queryName, null, $depth, null);
 
         $resourceInterface = new InterfaceType([
             'name' => $shortName,
             'description' => $resourceMetadata->getDescription(),
-            'fields' => $fields,
+            'fields' => function () use ($resourceClass, $resourceMetadata, $input, $mutationName, $queryName, $wrapData, $depth, $ioMetadata, $fieldsBuilder) {
+                if ($wrapData) {
+                    return [
+                        lcfirst($resourceMetadata->getShortName()) => $this->getResourceObjectType($resourceClass, $resourceMetadata, $input, $queryName, null, true, $depth),
+                    ];
+                }
+
+                return $fieldsBuilder->getResourceObjectTypeFields($resourceClass, $resourceMetadata, $input, $queryName, null, $depth, $ioMetadata);
+            },
             'resolveType' => function ($value, $context, $info) {
                 if (!isset($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY])) {
                     throw new \UnexpectedValueException('Resource class was not passed. Interface type can not be used.');
