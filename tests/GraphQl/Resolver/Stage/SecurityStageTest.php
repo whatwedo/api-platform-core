@@ -17,10 +17,10 @@ use ApiPlatform\Core\GraphQl\Resolver\Stage\SecurityStage;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
 use ApiPlatform\Core\Security\ResourceAccessCheckerInterface;
-use GraphQL\Error\Error;
 use GraphQL\Type\Definition\ResolveInfo;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * @author Alan Poulain <contact@alanpoulain.eu>
@@ -88,12 +88,42 @@ class SecurityStageTest extends TestCase
 
         $info = $this->prophesize(ResolveInfo::class)->reveal();
 
-        $this->expectException(Error::class);
+        $this->expectException(AccessDeniedHttpException::class);
         $this->expectExceptionMessage('Access Denied.');
 
         ($this->securityStage)($resourceClass, 'item_query', [
             'info' => $info,
             'extra_variables' => $extraVariables,
         ]);
+    }
+
+    public function testNoSecurityBundleInstalled(): void
+    {
+        $this->securityStage = new SecurityStage($this->resourceMetadataFactoryProphecy->reveal(), null);
+
+        $operationName = 'item_query';
+        $resourceClass = 'myResource';
+        $isGranted = 'not_granted';
+        $resourceMetadata = (new ResourceMetadata())->withGraphql([
+            $operationName => ['security' => $isGranted],
+        ]);
+        $this->resourceMetadataFactoryProphecy->create($resourceClass)->willReturn($resourceMetadata);
+
+        $this->expectException(\LogicException::class);
+
+        ($this->securityStage)($resourceClass, 'item_query', []);
+    }
+
+    public function testNoSecurityBundleInstalledNoExpression(): void
+    {
+        $this->securityStage = new SecurityStage($this->resourceMetadataFactoryProphecy->reveal(), null);
+
+        $resourceClass = 'myResource';
+        $resourceMetadata = new ResourceMetadata();
+        $this->resourceMetadataFactoryProphecy->create($resourceClass)->willReturn($resourceMetadata);
+
+        $this->resourceAccessCheckerProphecy->isGranted(Argument::any())->shouldNotBeCalled();
+
+        ($this->securityStage)($resourceClass, 'item_query', []);
     }
 }

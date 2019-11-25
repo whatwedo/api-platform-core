@@ -169,7 +169,11 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
      */
     public function denormalize($data, $class, $format = null, array $context = [])
     {
-        $resourceClass = $this->resourceClassResolver->getResourceClass(null, $class);
+        if (null === $objectToPopulate = $this->extractObjectToPopulate($class, $context, static::OBJECT_TO_POPULATE)) {
+            $normalizedData = $this->prepareForDenormalization($data);
+            $class = $this->getClassDiscriminatorResolvedClass($normalizedData, $class);
+        }
+        $resourceClass = $this->resourceClassResolver->getResourceClass($objectToPopulate, $class);
         $context['api_denormalize'] = true;
         $context['resource_class'] = $resourceClass;
 
@@ -223,8 +227,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     }
 
     /**
-     * Method copy-pasted from symfony/serializer.
-     * Remove it after symfony/serializer version update @link https://github.com/symfony/symfony/pull/28263.
+     * Originally from {@see https://github.com/symfony/symfony/pull/28263}. Refactor after it is merged.
      *
      * {@inheritdoc}
      *
@@ -238,19 +241,8 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
             return $object;
         }
 
-        if ($this->classDiscriminatorResolver && $mapping = $this->classDiscriminatorResolver->getMappingForClass($class)) {
-            if (!isset($data[$mapping->getTypeProperty()])) {
-                throw new RuntimeException(sprintf('Type property "%s" not found for the abstract object "%s"', $mapping->getTypeProperty(), $class));
-            }
-
-            $type = $data[$mapping->getTypeProperty()];
-            if (null === ($mappedClass = $mapping->getClassForType($type))) {
-                throw new RuntimeException(sprintf('The type "%s" has no mapped class for the abstract object "%s"', $type, $class));
-            }
-
-            $class = $mappedClass;
-            $reflectionClass = new \ReflectionClass($class);
-        }
+        $class = $this->getClassDiscriminatorResolvedClass($data, $class);
+        $reflectionClass = new \ReflectionClass($class);
 
         $constructor = $this->getConstructor($data, $class, $context, $reflectionClass, $allowedAttributes);
         if ($constructor) {
@@ -281,13 +273,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
                 } elseif ($constructorParameter->isDefaultValueAvailable()) {
                     $params[] = $constructorParameter->getDefaultValue();
                 } else {
-                    throw new MissingConstructorArgumentsException(
-                        sprintf(
-                            'Cannot create an instance of %s from serialized data because its constructor requires parameter "%s" to be present.',
-                            $class,
-                            $constructorParameter->name
-                        )
-                    );
+                    throw new MissingConstructorArgumentsException(sprintf('Cannot create an instance of %s from serialized data because its constructor requires parameter "%s" to be present.', $class, $constructorParameter->name));
                 }
             }
 
@@ -299,6 +285,24 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         }
 
         return new $class();
+    }
+
+    protected function getClassDiscriminatorResolvedClass(array &$data, string $class): string
+    {
+        if (null === $this->classDiscriminatorResolver || (null === $mapping = $this->classDiscriminatorResolver->getMappingForClass($class))) {
+            return $class;
+        }
+
+        if (!isset($data[$mapping->getTypeProperty()])) {
+            throw new RuntimeException(sprintf('Type property "%s" not found for the abstract object "%s"', $mapping->getTypeProperty(), $class));
+        }
+
+        $type = $data[$mapping->getTypeProperty()];
+        if (null === ($mappedClass = $mapping->getClassForType($type))) {
+            throw new RuntimeException(sprintf('The type "%s" has no mapped class for the abstract object "%s"', $type, $class));
+        }
+
+        return $mappedClass;
     }
 
     /**
@@ -368,9 +372,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         }
 
         if (!$isValid) {
-            throw new InvalidArgumentException(sprintf(
-                'The type of the "%s" attribute must be "%s", "%s" given.', $attribute, $builtinType, \gettype($value)
-            ));
+            throw new InvalidArgumentException(sprintf('The type of the "%s" attribute must be "%s", "%s" given.', $attribute, $builtinType, \gettype($value)));
         }
     }
 
@@ -382,9 +384,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     protected function denormalizeCollection(string $attribute, PropertyMetadata $propertyMetadata, Type $type, string $className, $value, ?string $format, array $context): array
     {
         if (!\is_array($value)) {
-            throw new InvalidArgumentException(sprintf(
-                'The type of the "%s" attribute must be "array", "%s" given.', $attribute, \gettype($value)
-            ));
+            throw new InvalidArgumentException(sprintf('The type of the "%s" attribute must be "array", "%s" given.', $attribute, \gettype($value)));
         }
 
         $collectionKeyType = $type->getCollectionKeyType();
@@ -393,10 +393,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         $values = [];
         foreach ($value as $index => $obj) {
             if (null !== $collectionKeyBuiltinType && !\call_user_func('is_'.$collectionKeyBuiltinType, $index)) {
-                throw new InvalidArgumentException(sprintf(
-                        'The type of the key "%s" must be "%s", "%s" given.',
-                        $index, $collectionKeyBuiltinType, \gettype($index))
-                );
+                throw new InvalidArgumentException(sprintf('The type of the key "%s" must be "%s", "%s" given.', $index, $collectionKeyBuiltinType, \gettype($index)));
             }
 
             $values[$index] = $this->denormalizeRelation($attribute, $propertyMetadata, $className, $obj, $format, $this->createChildContext($context, $attribute, $format));
@@ -455,9 +452,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
 
         if (!\is_array($value)) {
             if (!$supportsPlainIdentifiers) {
-                throw new UnexpectedValueException(sprintf(
-                    'Expected IRI or nested document for attribute "%s", "%s" given.', $attributeName, \gettype($value)
-                ));
+                throw new UnexpectedValueException(sprintf('Expected IRI or nested document for attribute "%s", "%s" given.', $attributeName, \gettype($value)));
             }
 
             $item = $this->itemDataProvider->getItem($className, $value, null, $context + ['fetch_data' => true]);
@@ -472,7 +467,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     }
 
     /**
-     * Gets a valid context for property name collection / property metadata factories.
+     * Gets the options for the property name collection / property metadata factories.
      */
     protected function getFactoryOptions(array $context): array
     {
@@ -509,7 +504,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     /**
      * {@inheritdoc}
      *
-     * @throws NoSuchPropertyException
+     * @throws UnexpectedValueException
      * @throws LogicException
      */
     protected function getAttributeValue($object, $attribute, $format = null, array $context = [])
@@ -517,6 +512,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         $context['api_attribute'] = $attribute;
         $propertyMetadata = $this->propertyMetadataFactory->create($context['resource_class'], $attribute, $this->getFactoryOptions($context));
 
+        // BC to be removed in 3.0
         try {
             $attributeValue = $this->propertyAccessor->getValue($object, $attribute);
         } catch (NoSuchPropertyException $e) {
@@ -530,13 +526,16 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         $type = $propertyMetadata->getType();
 
         if (
-            is_iterable($attributeValue) &&
             $type &&
             $type->isCollection() &&
             ($collectionValueType = $type->getCollectionValueType()) &&
             ($className = $collectionValueType->getClassName()) &&
             $this->resourceClassResolver->isResourceClass($className)
         ) {
+            if (!is_iterable($attributeValue)) {
+                throw new UnexpectedValueException('Unexpected non-iterable value for to-many relation.');
+            }
+
             $resourceClass = $this->resourceClassResolver->getResourceClass($attributeValue, $className);
             $childContext = $this->createChildContext($context, $attribute, $format);
             $childContext['resource_class'] = $resourceClass;
@@ -550,6 +549,10 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
             ($className = $type->getClassName()) &&
             $this->resourceClassResolver->isResourceClass($className)
         ) {
+            if (!\is_object($attributeValue) && null !== $attributeValue) {
+                throw new UnexpectedValueException('Unexpected non-object value for to-one relation.');
+            }
+
             $resourceClass = $this->resourceClassResolver->getResourceClass($attributeValue, $className);
             $childContext = $this->createChildContext($context, $attribute, $format);
             $childContext['resource_class'] = $resourceClass;
@@ -571,11 +574,17 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
      * Normalizes a collection of relations (to-many).
      *
      * @param iterable $attributeValue
+     *
+     * @throws UnexpectedValueException
      */
     protected function normalizeCollectionOfRelations(PropertyMetadata $propertyMetadata, $attributeValue, string $resourceClass, ?string $format, array $context): array
     {
         $value = [];
         foreach ($attributeValue as $index => $obj) {
+            if (!\is_object($obj) && null !== $obj) {
+                throw new UnexpectedValueException('Unexpected non-object element in to-many relation.');
+            }
+
             $value[$index] = $this->normalizeRelation($propertyMetadata, $obj, $resourceClass, $format, $context);
         }
 
@@ -583,11 +592,14 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     }
 
     /**
-     * Normalizes a relation as an object if is a Link or as an URI.
+     * Normalizes a relation.
+     *
+     * @param object|null $relatedObject
      *
      * @throws LogicException
+     * @throws UnexpectedValueException
      *
-     * @return string|array
+     * @return string|array|\ArrayObject|null IRI or normalized object data
      */
     protected function normalizeRelation(PropertyMetadata $propertyMetadata, $relatedObject, string $resourceClass, ?string $format, array $context)
     {
@@ -596,7 +608,12 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
                 throw new LogicException(sprintf('The injected serializer must be an instance of "%s".', NormalizerInterface::class));
             }
 
-            return $this->serializer->normalize($relatedObject, $format, $context);
+            $normalizedRelatedObject = $this->serializer->normalize($relatedObject, $format, $context);
+            if (!\is_string($normalizedRelatedObject) && !\is_array($normalizedRelatedObject) && !$normalizedRelatedObject instanceof \ArrayObject && null !== $normalizedRelatedObject) {
+                throw new UnexpectedValueException('Expected normalized relation to be an IRI, array, \ArrayObject or null');
+            }
+
+            return $normalizedRelatedObject;
         }
 
         $iri = $this->iriConverter->getIriFromItem($relatedObject);

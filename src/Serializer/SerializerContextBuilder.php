@@ -19,6 +19,7 @@ use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Swagger\Serializer\DocumentationNormalizer;
 use ApiPlatform\Core\Util\RequestAttributesExtractor;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Serializer\Encoder\CsvEncoder;
 
 /**
  * {@inheritdoc}
@@ -60,8 +61,14 @@ final class SerializerContextBuilder implements SerializerContextBuilderInterfac
         $context['operation_type'] = $operationType;
         $context[$operationKey] = $attributes[$operationKey];
 
-        if (!$normalization && !isset($context['api_allow_update'])) {
-            $context['api_allow_update'] = \in_array($request->getMethod(), ['PUT', 'PATCH'], true);
+        if (!$normalization) {
+            if (!isset($context['api_allow_update'])) {
+                $context['api_allow_update'] = \in_array($request->getMethod(), ['PUT', 'PATCH'], true);
+            }
+
+            if ('csv' === $request->getContentType()) {
+                $context[CsvEncoder::AS_COLLECTION_KEY] = false;
+            }
         }
 
         $context['resource_class'] = $attributes['resource_class'];
@@ -94,7 +101,7 @@ final class SerializerContextBuilder implements SerializerContextBuilderInterfac
         }
 
         foreach ($resourceMetadata->getItemOperations() as $operation) {
-            if ('PATCH' === $operation['method'] && \in_array('application/merge-patch+json', $operation['input_formats']['json'] ?? [], true)) {
+            if ('PATCH' === ($operation['method'] ?? '') && \in_array('application/merge-patch+json', $operation['input_formats']['json'] ?? [], true)) {
                 $context['skip_null_values'] = true;
 
                 break;
