@@ -327,7 +327,7 @@ final class TypeBuilder implements TypeBuilderInterface
                     throw new \UnexpectedValueException('Resource class was not passed. Interface type can not be used.');
                 }
 
-                $shortName = (new \ReflectionClass($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY]))->getShortName().'Item';
+                $shortName = (new \ReflectionClass($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY]))->getShortName();
 
                 if (!$this->typesContainer->has($shortName)) {
                     throw new \UnexpectedValueException("Type with name $shortName can not be found");
@@ -365,12 +365,7 @@ final class TypeBuilder implements TypeBuilderInterface
             throw new \UnexpectedValueException("Class $resourceClass can't be found.");
         }
 
-        $itemTypeName = $reflection->getShortName().self::INTERFACE_POSTFIX.self::ITEM_POSTFIX;
-        $itemType = $this->typesContainer->has($itemTypeName) ? [$this->typesContainer->get($itemTypeName)] : [];
-
-        $collectionTypeName = $reflection->getShortName().self::INTERFACE_POSTFIX.self::COLLECTION_POSTFIX;
-        $collectionType = $this->typesContainer->has($collectionTypeName) ? [$this->typesContainer->get($collectionTypeName)] : [];
-
-        return \array_merge($itemType, $collectionType);
+        $itemTypeName = $reflection->getShortName().self::INTERFACE_POSTFIX;
+        return $this->typesContainer->has($itemTypeName) ? [$this->typesContainer->get($itemTypeName)] : [];
     }
 }
