@@ -312,20 +312,23 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
      */
     private function registerSwaggerConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader): void
     {
+        $container->setParameter('api_platform.swagger.versions', $config['swagger']['versions']);
+
         if (empty($config['swagger']['versions'])) {
             return;
         }
 
         $loader->load('json_schema.xml');
         $loader->load('swagger.xml');
+        $loader->load('swagger-ui.xml');
 
-        if ($config['enable_swagger_ui'] || $config['enable_re_doc']) {
-            $loader->load('swagger-ui.xml');
-            $container->setParameter('api_platform.enable_swagger_ui', $config['enable_swagger_ui']);
-            $container->setParameter('api_platform.enable_re_doc', $config['enable_re_doc']);
+        if (!$config['enable_swagger_ui'] && !$config['enable_re_doc']) {
+            // Remove the listener but keep the controller to allow customizing the path of the UI
+            $container->removeDefinition('api_platform.swagger.listener.ui');
         }
 
-        $container->setParameter('api_platform.swagger.versions', $config['swagger']['versions']);
+        $container->setParameter('api_platform.enable_swagger_ui', $config['enable_swagger_ui']);
+        $container->setParameter('api_platform.enable_re_doc', $config['enable_re_doc']);
         $container->setParameter('api_platform.swagger.api_keys', $config['swagger']['api_keys']);
     }
 
@@ -346,6 +349,10 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
 
         $loader->load('jsonld.xml');
         $loader->load('hydra.xml');
+
+        if (!$container->has('api_platform.json_schema.schema_factory')) {
+            $container->removeDefinition('api_platform.hydra.json_schema.schema_factory');
+        }
 
         if (!$docEnabled) {
             $container->removeDefinition('api_platform.hydra.listener.response.add_link_header');
