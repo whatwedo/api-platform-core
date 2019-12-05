@@ -45,6 +45,10 @@ trait InputOutputMetadataTrait
             return null;
         }
 
-        return $metadata->getAttribute($inputOrOutput)['class'] ?? null;
+        $graphQlAttribute = isset($context['graphql_operation_name'])
+	        ? $metadata->getGraphqlAttribute($context['graphql_operation_name'], $inputOrOutput)
+	        : null;
+
+	    return $graphQlAttribute['class'] ?? $metadata->getAttribute($inputOrOutput)['class'] ?? null;
     }
 }

@@ -288,7 +288,12 @@ final class EagerLoadingExtension implements ContextAwareQueryCollectionExtensio
             return $this->serializerContextBuilder->createFromRequest($request, 'normalization_context' === $contextType);
         }
 
-        $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
+	    try {
+		    $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
+		    } catch (ResourceClassNotFoundException $e) {
+		    return [];
+		}
+
         if (isset($options['collection_operation_name'])) {
             $context = $resourceMetadata->getCollectionOperationAttribute($options['collection_operation_name'], $contextType, null, true);
         } elseif (isset($options['item_operation_name'])) {

@@ -91,7 +91,9 @@ final class AnnotationResourceMetadataFactory implements ResourceMetadataFactory
                 $annotation->collectionOperations ?? $this->defaults['collection_operations'] ?? null,
                 $attributes,
                 $annotation->subresourceOperations,
-                $annotation->graphql ?? $this->defaults['graphql'] ?? null
+                $annotation->graphql ?? $this->defaults['graphql'] ?? null,
+                $annotation->isInterface,
+                $annotation->implements
             );
         }
 

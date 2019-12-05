@@ -92,57 +92,65 @@ final class QueryChecker
     public static function hasOrderByOnFetchJoinedToManyAssociation(QueryBuilder $queryBuilder, ManagerRegistry $managerRegistry): bool
     {
         if (
-            0 === \count($selectParts = $queryBuilder->getDQLPart('select')) ||
-            0 === \count($queryBuilder->getDQLPart('join')) ||
-            0 === \count($orderByParts = $queryBuilder->getDQLPart('orderBy'))
+            empty($orderByParts = $queryBuilder->getDQLPart('orderBy')) ||
+            empty($joinParts = $queryBuilder->getDQLPart('join'))
         ) {
             return false;
         }
 
-        $rootAliases = $queryBuilder->getRootAliases();
-
-        $selectAliases = [];
-
-        foreach ($selectParts as $select) {
-            foreach ($select->getParts() as $part) {
-                [$alias] = explode('.', $part);
-
-                $selectAliases[] = $alias;
-            }
-        }
-
-        $selectAliases = array_diff($selectAliases, $rootAliases);
-        if (0 === \count($selectAliases)) {
-            return false;
-        }
-
         $orderByAliases = [];
-
         foreach ($orderByParts as $orderBy) {
-            foreach ($orderBy->getParts() as $part) {
-                if (false !== strpos($part, '.')) {
-                    [$alias] = explode('.', $part);
+            $parts = $orderBy->getParts();
 
-                    $orderByAliases[] = $alias;
+            foreach ($parts as $part) {
+                $pos = strpos($part, '.');
+                if (false !== $pos) {
+                    $orderByAliases[substr($part, 0, $pos)] = true;
                 }
             }
         }
 
-        $orderByAliases = array_diff($orderByAliases, $rootAliases);
-        if (0 === \count($orderByAliases)) {
+        if (!$orderByAliases) {
             return false;
         }
 
-        foreach ($orderByAliases as $orderByAlias) {
-            $inToManyContext = false;
+        foreach ($joinParts as $joins) {
+            foreach ($joins as $join) {
+                $alias = $join->getAlias();
 
-            foreach (QueryBuilderHelper::traverseJoins($orderByAlias, $queryBuilder, $managerRegistry) as $alias => [$metadata, $association]) {
-                if ($inToManyContext && \in_array($alias, $selectAliases, true)) {
-                    return true;
+                if (!isset($orderByAliases[$alias])) {
+                    continue;
                 }
+                $relationship = $join->getJoin();
 
-                if (null !== $association && $metadata->isCollectionValuedAssociation($association)) {
-                    $inToManyContext = true;
+                if (false !== strpos($relationship, '.')) {
+                    /*
+                     * We select the parent alias because it may differ from the origin alias given above
+                     * @see https://github.com/api-platform/core/issues/1313
+                     */
+                    [$relationAlias, $association] = explode('.', $relationship);
+                    $metadata = QueryJoinParser::getClassMetadataFromJoinAlias($relationAlias, $queryBuilder, $managerRegistry);
+                    if ($metadata->isCollectionValuedAssociation($association)) {
+                        return true;
+                    }
+                } else {
+                    $parentMetadata = $managerRegistry->getManagerForClass($relationship)->getClassMetadata($relationship);
+
+                    foreach ($queryBuilder->getRootEntities() as $rootEntity) {
+                        $rootMetadata = $managerRegistry
+                            ->getManagerForClass($rootEntity)
+                            ->getClassMetadata($rootEntity);
+
+                        if (!$rootMetadata instanceof ClassMetadata) {
+                            continue;
+                        }
+
+                        foreach ($rootMetadata->getAssociationsByTargetClass($relationship) as $association => $mapping) {
+                            if ($parentMetadata->isCollectionValuedAssociation($association)) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }

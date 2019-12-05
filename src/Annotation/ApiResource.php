@@ -142,6 +142,16 @@ final class ApiResource
     public $graphql;
 
     /**
+     * @var bool
+     */
+    public $isInterface;
+
+    /**
+     * @var string
+     */
+    public $implements;
+
+    /**
      * @var string
      */
     public $iri;
