@@ -3,10 +3,18 @@
 ## 2.6.x-dev
 
 * MongoDB: Possibility to add execute options (aggregate command fields) for a resource, like `allowDiskUse` (#3144)
+* MongoDB: Mercure support (#3290)
 * GraphQL: Allow to format GraphQL errors based on exceptions (#3063)
 * GraphQL: Add page-based pagination (#3175)
 * OpenAPI: Add PHP default values to the documentation (#2386)
  
+## 2.5.4
+
+* Add a local cache in `ResourceClassResolver::getResourceClass()`
+* JSON Schema: Fix  generation for non-resource class
+* Doctrine: Get class metadata only when it's needed in `SearchFilter`
+* GraphQL: Better detection of collection type
+
 ## 2.5.3
 
 * Compatibility with Symfony 5
