@@ -103,7 +103,7 @@ final class TypeBuilder implements TypeBuilderInterface
 
         $resourceObjectType = $resourceMetadata->isInterface()
             ? $this->buildResourceInterfaceType($resourceClass, $shortName, $resourceMetadata, $input, $queryName, $mutationName, $wrapped, $depth)
-            : $this->buildResourceObjectType($resourceClass, $shortName, $resourceMetadata, $input, $queryName, $mutationName, $wrapped, $depth);
+            : $this->buildResourceObjectType($resourceClass, $shortName, $resourceMetadata, $input, $queryName, $mutationName, $subscriptionName, $wrapped, $depth);
         $this->typesContainer->set($shortName, $resourceObjectType);
 
         return $resourceObjectType;
@@ -242,7 +242,7 @@ final class TypeBuilder implements TypeBuilderInterface
         ];
     }
 
-    private function buildResourceObjectType(?string $resourceClass, string $shortName, ResourceMetadata $resourceMetadata, bool $input, ?string $queryName, ?string $mutationName, bool $wrapped, int $depth)
+    private function buildResourceObjectType(?string $resourceClass, string $shortName, ResourceMetadata $resourceMetadata, bool $input, ?string $queryName, ?string $mutationName, ?string $subscriptionName, bool $wrapped, int $depth)
     {
         $ioMetadata = $resourceMetadata->getGraphqlAttribute($subscriptionName ?? $mutationName ?? $queryName, $input ? 'input' : 'output', null, true);
         if (null !== $ioMetadata && \array_key_exists('class', $ioMetadata) && null !== $ioMetadata['class']) {
@@ -332,7 +332,7 @@ final class TypeBuilder implements TypeBuilderInterface
                     ];
                 }
 
-                return $fieldsBuilder->getResourceObjectTypeFields($resourceClass, $resourceMetadata, $input, $queryName, null, $depth, $ioMetadata);
+                return $fieldsBuilder->getResourceObjectTypeFields($resourceClass, $resourceMetadata, $input, $queryName, null, null, $depth, $ioMetadata);
             },
             'resolveType' => function ($value, $context, $info) {
                 if (!isset($value[ItemNormalizer::ITEM_RESOURCE_CLASS_KEY])) {
