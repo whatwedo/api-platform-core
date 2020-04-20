@@ -23,6 +23,8 @@ use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryCollectionExtensionInter
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\AbstractContextAwareFilter as DoctrineOrmAbstractContextAwareFilter;
 use ApiPlatform\Core\Bridge\Elasticsearch\DataProvider\Extension\RequestBodySearchCollectionExtensionInterface;
+use ApiPlatform\Core\Bridge\Symfony\Validator\Metadata\Property\Restriction\PropertySchemaRestrictionMetadataInterface;
+use ApiPlatform\Core\Bridge\Symfony\Validator\ValidationGroupsGeneratorInterface;
 use ApiPlatform\Core\DataPersister\DataPersisterInterface;
 use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
@@ -165,25 +167,26 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.eager_loading.fetch_partial', $config['eager_loading']['fetch_partial']);
         $container->setParameter('api_platform.eager_loading.force_eager', $config['eager_loading']['force_eager']);
         $container->setParameter('api_platform.collection.exists_parameter_name', $config['collection']['exists_parameter_name']);
-        $container->setParameter('api_platform.collection.order', $config['collection']['order']);
+        $container->setParameter('api_platform.collection.order', $config['defaults']['order'] ?? $config['collection']['order']);
         $container->setParameter('api_platform.collection.order_parameter_name', $config['collection']['order_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.enabled', $this->isConfigEnabled($container, $config['collection']['pagination']));
-        $container->setParameter('api_platform.collection.pagination.partial', $config['collection']['pagination']['partial']);
-        $container->setParameter('api_platform.collection.pagination.client_enabled', $config['collection']['pagination']['client_enabled']);
-        $container->setParameter('api_platform.collection.pagination.client_items_per_page', $config['collection']['pagination']['client_items_per_page']);
-        $container->setParameter('api_platform.collection.pagination.client_partial', $config['collection']['pagination']['client_partial']);
-        $container->setParameter('api_platform.collection.pagination.items_per_page', $config['collection']['pagination']['items_per_page']);
-        $container->setParameter('api_platform.collection.pagination.maximum_items_per_page', $config['collection']['pagination']['maximum_items_per_page']);
-        $container->setParameter('api_platform.collection.pagination.page_parameter_name', $config['collection']['pagination']['page_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.enabled_parameter_name', $config['collection']['pagination']['enabled_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.items_per_page_parameter_name', $config['collection']['pagination']['items_per_page_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.partial_parameter_name', $config['collection']['pagination']['partial_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination', $config['collection']['pagination']);
-        $container->setParameter('api_platform.http_cache.etag', $config['http_cache']['etag']);
-        $container->setParameter('api_platform.http_cache.max_age', $config['http_cache']['max_age']);
-        $container->setParameter('api_platform.http_cache.shared_max_age', $config['http_cache']['shared_max_age']);
-        $container->setParameter('api_platform.http_cache.vary', $config['http_cache']['vary']);
-        $container->setParameter('api_platform.http_cache.public', $config['http_cache']['public']);
+        $container->setParameter('api_platform.collection.pagination.enabled', $this->isConfigEnabled($container, $config['defaults']['pagination_enabled'] ?? $config['collection']['pagination']));
+        $container->setParameter('api_platform.collection.pagination.partial', $config['defaults']['pagination_partial'] ?? $config['collection']['pagination']['partial']);
+        $container->setParameter('api_platform.collection.pagination.client_enabled', $config['defaults']['pagination_client_enabled'] ?? $config['collection']['pagination']['client_enabled']);
+        $container->setParameter('api_platform.collection.pagination.client_items_per_page', $config['defaults']['pagination_client_items_per_page'] ?? $config['collection']['pagination']['client_items_per_page']);
+        $container->setParameter('api_platform.collection.pagination.client_partial', $config['defaults']['pagination_client_partial'] ?? $config['collection']['pagination']['client_partial']);
+        $container->setParameter('api_platform.collection.pagination.items_per_page', $config['defaults']['pagination_items_per_page'] ?? $config['collection']['pagination']['items_per_page']);
+        $container->setParameter('api_platform.collection.pagination.maximum_items_per_page', $config['defaults']['pagination_maximum_items_per_page'] ?? $config['collection']['pagination']['maximum_items_per_page']);
+        $container->setParameter('api_platform.collection.pagination.page_parameter_name', $config['defaults']['pagination_page_parameter_name'] ?? $config['collection']['pagination']['page_parameter_name']);
+        $container->setParameter('api_platform.collection.pagination.enabled_parameter_name', $config['defaults']['pagination_enabled_parameter_name'] ?? $config['collection']['pagination']['enabled_parameter_name']);
+        $container->setParameter('api_platform.collection.pagination.items_per_page_parameter_name', $config['defaults']['pagination_items_per_page_parameter_name'] ?? $config['collection']['pagination']['items_per_page_parameter_name']);
+        $container->setParameter('api_platform.collection.pagination.partial_parameter_name', $config['defaults']['pagination_partial_parameter_name'] ?? $config['collection']['pagination']['partial_parameter_name']);
+        $container->setParameter('api_platform.collection.pagination', $this->getPaginationDefaults($config['defaults'] ?? [], $config['collection']['pagination']));
+        $container->setParameter('api_platform.http_cache.etag', $config['defaults']['cache_headers']['etag'] ?? $config['http_cache']['etag']);
+        $container->setParameter('api_platform.http_cache.max_age', $config['defaults']['cache_headers']['max_age'] ?? $config['http_cache']['max_age']);
+        $container->setParameter('api_platform.http_cache.shared_max_age', $config['defaults']['cache_headers']['shared_max_age'] ?? $config['http_cache']['shared_max_age']);
+        $container->setParameter('api_platform.http_cache.vary', $config['defaults']['cache_headers']['vary'] ?? $config['http_cache']['vary']);
+        $container->setParameter('api_platform.http_cache.public', $config['defaults']['cache_headers']['public'] ?? $config['http_cache']['public']);
+        $container->setParameter('api_platform.http_cache.invalidation.max_header_length', $config['defaults']['cache_headers']['invalidation']['max_header_length'] ?? $config['http_cache']['invalidation']['max_header_length']);
 
         $container->setAlias('api_platform.operation_path_resolver.default', $config['default_operation_path_resolver']);
         $container->setAlias('api_platform.path_segment_name_generator', $config['path_segment_name_generator']);
@@ -192,6 +195,24 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             $container->setAlias('api_platform.name_converter', $config['name_converter']);
         }
         $container->setParameter('api_platform.defaults', $this->normalizeDefaults($config['defaults'] ?? []));
+    }
+
+    /**
+     * This method will be removed in 3.0 when "defaults" will be the regular configuration path for the pagination.
+     */
+    private function getPaginationDefaults(array $defaults, array $collectionPaginationConfiguration): array
+    {
+        $paginationOptions = [];
+
+        foreach ($defaults as $key => $value) {
+            if (0 !== strpos($key, 'pagination_')) {
+                continue;
+            }
+
+            $paginationOptions[str_replace('pagination_', '', $key)] = $value;
+        }
+
+        return array_merge($collectionPaginationConfiguration, $paginationOptions);
     }
 
     private function normalizeDefaults(array $defaults): array
@@ -530,7 +551,8 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             $definitions[] = $definition;
         }
 
-        $container->getDefinition('api_platform.http_cache.purger.varnish')->addArgument($definitions);
+        $container->getDefinition('api_platform.http_cache.purger.varnish')->setArguments([$definitions,
+            $config['http_cache']['invalidation']['max_header_length'], ]);
         $container->setAlias('api_platform.http_cache.purger', 'api_platform.http_cache.purger.varnish');
     }
 
@@ -553,6 +575,12 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
     {
         if (interface_exists(ValidatorInterface::class)) {
             $loader->load('validator.xml');
+
+            $container->registerForAutoconfiguration(ValidationGroupsGeneratorInterface::class)
+                ->addTag('api_platform.validation_groups_generator')
+                ->setPublic(true); // this line should be removed in 3.0
+            $container->registerForAutoconfiguration(PropertySchemaRestrictionMetadataInterface::class)
+                ->addTag('api_platform.metadata.property_schema_restriction');
         }
 
         if (!$config['validator']) {
@@ -586,6 +614,14 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
 
         if ($this->isConfigEnabled($container, $config['doctrine'])) {
             $loader->load('doctrine_orm_mercure_publisher.xml');
+        }
+        if ($this->isConfigEnabled($container, $config['doctrine_mongodb_odm'])) {
+            $loader->load('doctrine_mongodb_odm_mercure_publisher.xml');
+        }
+
+        if ($this->isConfigEnabled($container, $config['graphql'])) {
+            $loader->load('graphql_mercure.xml');
+            $container->getDefinition('api_platform.graphql.subscription.mercure_iri_generator')->addArgument($config['mercure']['hub_url'] ?? '%mercure.default_hub%');
         }
     }
 

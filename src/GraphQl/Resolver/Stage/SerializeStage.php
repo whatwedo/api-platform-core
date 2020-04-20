@@ -15,6 +15,7 @@ namespace ApiPlatform\Core\GraphQl\Resolver\Stage;
 
 use ApiPlatform\Core\DataProvider\Pagination;
 use ApiPlatform\Core\DataProvider\PaginatorInterface;
+use ApiPlatform\Core\GraphQl\Resolver\Util\IdentifierTrait;
 use ApiPlatform\Core\GraphQl\Serializer\ItemNormalizer;
 use ApiPlatform\Core\GraphQl\Serializer\SerializerContextBuilderInterface;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
@@ -29,6 +30,8 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
  */
 final class SerializeStage implements SerializeStageInterface
 {
+    use IdentifierTrait;
+
     private $resourceMetadataFactory;
     private $normalizer;
     private $serializerContextBuilder;
@@ -49,6 +52,7 @@ final class SerializeStage implements SerializeStageInterface
     {
         $isCollection = $context['is_collection'];
         $isMutation = $context['is_mutation'];
+        $isSubscription = $context['is_subscription'];
 
         $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
         if (!$resourceMetadata->getGraphqlAttribute($operationName, 'serialize', true, true)) {
@@ -66,6 +70,10 @@ final class SerializeStage implements SerializeStageInterface
                 return $this->getDefaultMutationData($context);
             }
 
+            if ($isSubscription) {
+                return $this->getDefaultSubscriptionData($context);
+            }
+
             return null;
         }
 
@@ -75,7 +83,11 @@ final class SerializeStage implements SerializeStageInterface
 
         $data = null;
         if (!$isCollection) {
-            $data = $this->normalizer->normalize($itemOrCollection, ItemNormalizer::FORMAT, $normalizationContext);
+            if ($isMutation && 'delete' === $operationName) {
+                $data = ['id' => $this->getIdentifierFromContext($context)];
+            } else {
+                $data = $this->normalizer->normalize($itemOrCollection, ItemNormalizer::FORMAT, $normalizationContext);
+            }
         }
 
         if ($isCollection && is_iterable($itemOrCollection)) {
@@ -95,10 +107,10 @@ final class SerializeStage implements SerializeStageInterface
             throw new \UnexpectedValueException('Expected serialized data to be a nullable array.');
         }
 
-        if ($isMutation) {
+        if ($isMutation || $isSubscription) {
             $wrapFieldName = lcfirst($resourceMetadata->getShortName());
 
-            return [$wrapFieldName => $data] + $this->getDefaultMutationData($context);
+            return [$wrapFieldName => $data] + ($isMutation ? $this->getDefaultMutationData($context) : $this->getDefaultSubscriptionData($context));
         }
 
         return $data;
@@ -121,15 +133,15 @@ final class SerializeStage implements SerializeStageInterface
         $nbPageItems = $collection->count();
         if (isset($args['after'])) {
             $after = base64_decode($args['after'], true);
-            if (false === $after) {
-                throw new \UnexpectedValueException(sprintf('Cursor %s is invalid.', $args['after']));
+            if (false === $after || '' === $args['after']) {
+                throw new \UnexpectedValueException('' === $args['after'] ? 'Empty cursor is invalid' : sprintf('Cursor %s is invalid', $args['after']));
             }
             $offset = 1 + (int) $after;
         }
         if (isset($args['before'])) {
             $before = base64_decode($args['before'], true);
-            if (false === $before) {
-                throw new \UnexpectedValueException(sprintf('Cursor %s is invalid.', $args['before']));
+            if (false === $before || '' === $args['before']) {
+                throw new \UnexpectedValueException('' === $args['before'] ? 'Empty cursor is invalid' : sprintf('Cursor %s is invalid', $args['before']));
             }
             $offset = (int) $before - $nbPageItems;
         }
@@ -196,5 +208,10 @@ final class SerializeStage implements SerializeStageInterface
     private function getDefaultMutationData(array $context): array
     {
         return ['clientMutationId' => $context['args']['input']['clientMutationId'] ?? null];
+    }
+
+    private function getDefaultSubscriptionData(array $context): array
+    {
+        return ['clientSubscriptionId' => $context['args']['input']['clientSubscriptionId'] ?? null];
     }
 }

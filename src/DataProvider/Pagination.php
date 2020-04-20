@@ -91,7 +91,13 @@ final class Pagination
             return ($offset = ($context['count'] ?? 0) - $last) < 0 ? 0 : $offset;
         }
 
-        return ($this->getPage($context) - 1) * $limit;
+        $offset = ($this->getPage($context) - 1) * $limit;
+
+        if (!\is_int($offset)) {
+            throw new InvalidArgumentException('Page parameter is too large.');
+        }
+
+        return $offset;
     }
 
     /**
@@ -203,7 +209,11 @@ final class Pagination
 
     public function getGraphQlPaginationType(string $resourceClass, string $operationName): string
     {
-        $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
+        try {
+            $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
+        } catch (ResourceClassNotFoundException $e) {
+            return 'cursor';
+        }
 
         return (string) $resourceMetadata->getGraphqlAttribute($operationName, 'paginationType', 'cursor', true);
     }

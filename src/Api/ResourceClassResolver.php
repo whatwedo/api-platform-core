@@ -29,6 +29,7 @@ final class ResourceClassResolver implements ResourceClassResolverInterface
 
     private $resourceNameCollectionFactory;
     private $localIsResourceClassCache = [];
+    private $localMostSpecificResourceClassCache = [];
 
     public function __construct(ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory)
     {
@@ -44,7 +45,8 @@ final class ResourceClassResolver implements ResourceClassResolverInterface
             throw new InvalidArgumentException('Strict checking is only possible when resource class is specified.');
         }
 
-        $actualClass = \is_object($value) && !$value instanceof \Traversable ? $this->getObjectClass($value) : null;
+        $objectClass = \is_object($value) ? $this->getObjectClass($value) : null;
+        $actualClass = ($objectClass && (!$value instanceof \Traversable || $this->isResourceClass($objectClass))) ? $this->getObjectClass($value) : null;
 
         if (null === $actualClass && null === $resourceClass) {
             throw new InvalidArgumentException('Resource type could not be determined. Resource class must be specified.');
@@ -63,6 +65,11 @@ final class ResourceClassResolver implements ResourceClassResolverInterface
         }
 
         $targetClass = $actualClass ?? $resourceClass;
+
+        if (isset($this->localMostSpecificResourceClassCache[$targetClass])) {
+            return $this->localMostSpecificResourceClassCache[$targetClass];
+        }
+
         $mostSpecificResourceClass = null;
 
         foreach ($this->resourceNameCollectionFactory->create() as $resourceClassName) {
@@ -78,6 +85,8 @@ final class ResourceClassResolver implements ResourceClassResolverInterface
         if (null === $mostSpecificResourceClass) {
             throw new \LogicException('Unexpected execution flow.');
         }
+
+        $this->localMostSpecificResourceClassCache[$targetClass] = $mostSpecificResourceClass;
 
         return $mostSpecificResourceClass;
     }

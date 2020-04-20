@@ -18,7 +18,7 @@ use ApiPlatform\Core\JsonSchema\SchemaFactory as BaseSchemaFactory;
 use ApiPlatform\Core\JsonSchema\SchemaFactoryInterface;
 
 /**
- * Generates the JSON Schema corresponding to a Hydra document.
+ * Decorator factory which adds Hydra properties to the JSON Schema document.
  *
  * @experimental
  *
@@ -38,18 +38,21 @@ final class SchemaFactory implements SchemaFactoryInterface
 
     private $schemaFactory;
 
-    public function __construct(BaseSchemaFactory $schemaFactory)
+    public function __construct(SchemaFactoryInterface $schemaFactory)
     {
         $this->schemaFactory = $schemaFactory;
-        $schemaFactory->addDistinctFormat('jsonld');
+
+        if ($schemaFactory instanceof BaseSchemaFactory) {
+            $schemaFactory->addDistinctFormat('jsonld');
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function buildSchema(string $resourceClass, string $format = 'jsonld', string $type = Schema::TYPE_OUTPUT, ?string $operationType = null, ?string $operationName = null, ?Schema $schema = null, ?array $serializerContext = null, bool $forceCollection = false): Schema
+    public function buildSchema(string $className, string $format = 'jsonld', string $type = Schema::TYPE_OUTPUT, ?string $operationType = null, ?string $operationName = null, ?Schema $schema = null, ?array $serializerContext = null, bool $forceCollection = false): Schema
     {
-        $schema = $this->schemaFactory->buildSchema($resourceClass, $format, $type, $operationType, $operationName, $schema, $serializerContext, $forceCollection);
+        $schema = $this->schemaFactory->buildSchema($className, $format, $type, $operationType, $operationName, $schema, $serializerContext, $forceCollection);
         if ('jsonld' !== $format) {
             return $schema;
         }
