@@ -24,6 +24,7 @@ use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\PropertyMetadata;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
+use ApiPlatform\Core\Security\ResourceAccessCheckerInterface;
 use ApiPlatform\Core\Util\ClassInfoTrait;
 use Symfony\Component\PropertyAccess\Exception\NoSuchPropertyException;
 use Symfony\Component\PropertyAccess\PropertyAccess;
@@ -51,17 +52,20 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
     use ContextTrait;
     use InputOutputMetadataTrait;
 
+    public const IS_TRANSFORMED_TO_SAME_CLASS = 'is_transformed_to_same_class';
+
     protected $propertyNameCollectionFactory;
     protected $propertyMetadataFactory;
     protected $iriConverter;
     protected $resourceClassResolver;
+    protected $resourceAccessChecker;
     protected $propertyAccessor;
     protected $itemDataProvider;
     protected $allowPlainIdentifiers;
     protected $dataTransformers = [];
     protected $localCache = [];
 
-    public function __construct(PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, IriConverterInterface $iriConverter, ResourceClassResolverInterface $resourceClassResolver, PropertyAccessorInterface $propertyAccessor = null, NameConverterInterface $nameConverter = null, ClassMetadataFactoryInterface $classMetadataFactory = null, ItemDataProviderInterface $itemDataProvider = null, bool $allowPlainIdentifiers = false, array $defaultContext = [], iterable $dataTransformers = [], ResourceMetadataFactoryInterface $resourceMetadataFactory = null)
+    public function __construct(PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, IriConverterInterface $iriConverter, ResourceClassResolverInterface $resourceClassResolver, PropertyAccessorInterface $propertyAccessor = null, NameConverterInterface $nameConverter = null, ClassMetadataFactoryInterface $classMetadataFactory = null, ItemDataProviderInterface $itemDataProvider = null, bool $allowPlainIdentifiers = false, array $defaultContext = [], iterable $dataTransformers = [], ResourceMetadataFactoryInterface $resourceMetadataFactory = null, ResourceAccessCheckerInterface $resourceAccessChecker = null)
     {
         if (!isset($defaultContext['circular_reference_handler'])) {
             $defaultContext['circular_reference_handler'] = function ($object) {
@@ -83,6 +87,7 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         $this->allowPlainIdentifiers = $allowPlainIdentifiers;
         $this->dataTransformers = $dataTransformers;
         $this->resourceMetadataFactory = $resourceMetadataFactory;
+        $this->resourceAccessChecker = $resourceAccessChecker;
     }
 
     /**
@@ -112,17 +117,23 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
      */
     public function normalize($object, $format = null, array $context = [])
     {
-        if ($object !== $transformed = $this->transformOutput($object, $context)) {
+        if (!($isTransformed = isset($context[self::IS_TRANSFORMED_TO_SAME_CLASS])) && $outputClass = $this->getOutputClass($this->getObjectClass($object), $context)) {
             if (!$this->serializer instanceof NormalizerInterface) {
                 throw new LogicException('Cannot normalize the output because the injected serializer is not a normalizer');
             }
 
-            $context['api_normalize'] = true;
-            $context['api_resource'] = $object;
-            unset($context['output']);
-            unset($context['resource_class']);
+            if ($object !== $transformed = $this->transformOutput($object, $context, $outputClass)) {
+                $context['api_normalize'] = true;
+                $context['api_resource'] = $object;
+                unset($context['output'], $context['resource_class']);
+            } else {
+                $context[self::IS_TRANSFORMED_TO_SAME_CLASS] = true;
+            }
 
             return $this->serializer->normalize($transformed, $format, $context);
+        }
+        if ($isTransformed) {
+            unset($context[self::IS_TRANSFORMED_TO_SAME_CLASS]);
         }
 
         $resourceClass = $this->resourceClassResolver->getResourceClass($object, $context['resource_class'] ?? null);
@@ -347,6 +358,25 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
         }
 
         return $allowedAttributes;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function isAllowedAttribute($classOrObject, $attribute, $format = null, array $context = [])
+    {
+        if (!parent::isAllowedAttribute($classOrObject, $attribute, $format, $context)) {
+            return false;
+        }
+
+        $options = $this->getFactoryOptions($context);
+        $propertyMetadata = $this->propertyMetadataFactory->create($context['resource_class'], $attribute, $options);
+        $security = $propertyMetadata->getAttribute('security');
+        if ($this->resourceAccessChecker && $security) {
+            return $this->resourceAccessChecker->isGranted($attribute, $security);
+        }
+
+        return true;
     }
 
     /**
@@ -647,9 +677,12 @@ abstract class AbstractItemNormalizer extends AbstractObjectNormalizer
      * For a given resource, it returns an output representation if any
      * If not, the resource is returned.
      */
-    protected function transformOutput($object, array $context = [])
+    protected function transformOutput($object, array $context = [], string $outputClass = null)
     {
-        $outputClass = $this->getOutputClass($this->getObjectClass($object), $context);
+        if (null === $outputClass) {
+            $outputClass = $this->getOutputClass($this->getObjectClass($object), $context);
+        }
+
         if (null !== $outputClass && null !== $dataTransformer = $this->getDataTransformer($object, $outputClass, $context)) {
             return $dataTransformer->transform($object, $outputClass, $context);
         }

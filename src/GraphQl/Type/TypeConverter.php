@@ -62,6 +62,10 @@ final class TypeConverter implements TypeConverterInterface
                 return GraphQLType::string();
             case Type::BUILTIN_TYPE_ARRAY:
             case Type::BUILTIN_TYPE_ITERABLE:
+                if ($resourceType = $this->getResourceType($type, $input, $queryName, $mutationName, $subscriptionName, $depth)) {
+                    return $resourceType;
+                }
+
                 return 'Iterable';
             case Type::BUILTIN_TYPE_OBJECT:
                 if ($input && $depth > 0) {
@@ -105,8 +109,11 @@ final class TypeConverter implements TypeConverterInterface
 
         try {
             $resourceMetadata = $this->resourceMetadataFactory->create($resourceClass);
-            if (0 === $depth && [] === ($resourceMetadata->getGraphql() ?? [])) {
+            if (null === $resourceMetadata->getGraphql()) {
                 return null;
+            }
+            if ('Node' === $resourceMetadata->getShortName()) {
+                throw new \UnexpectedValueException('A "Node" resource cannot be used with GraphQL because the type is already used by the Relay specification.');
             }
         } catch (ResourceClassNotFoundException $e) {
             // Skip objects that are not resources for now

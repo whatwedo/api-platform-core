@@ -27,6 +27,7 @@ use GraphQL\GraphQL;
 use Symfony\Bundle\FullStack;
 use Symfony\Bundle\MercureBundle\MercureBundle;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\Config\Definition\BaseNode;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -87,7 +88,7 @@ final class Configuration implements ConfigurationInterface
                 ->booleanNode('show_webby')->defaultTrue()->info('If true, show Webby on the documentation page')->end()
                 ->scalarNode('default_operation_path_resolver')
                     ->defaultValue('api_platform.operation_path_resolver.underscore')
-                    ->setDeprecated('The use of the `default_operation_path_resolver` has been deprecated in 2.1 and will be removed in 3.0. Use `path_segment_name_generator` instead.')
+                    ->setDeprecated(...$this->buildDeprecationArgs('2.1', 'The use of the `default_operation_path_resolver` has been deprecated in 2.1 and will be removed in 3.0. Use `path_segment_name_generator` instead.'))
                     ->info('Specify the default operation path resolver to use for generating resources operations path.')
                 ->end()
                 ->scalarNode('name_converter')->defaultNull()->info('Specify a name converter to use.')->end()
@@ -96,7 +97,7 @@ final class Configuration implements ConfigurationInterface
                 ->arrayNode('validator')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->variableNode('serialize_payload_fields')->defaultValue([])->info('Enable the serialization of payload fields when a validation error is thrown.')->end()
+                        ->variableNode('serialize_payload_fields')->defaultValue([])->info('Set to null to serialize all payload fields when a validation error is thrown, or set the fields you want to include explicitly.')->end()
                     ->end()
                 ->end()
                 ->arrayNode('eager_loading')
@@ -111,7 +112,7 @@ final class Configuration implements ConfigurationInterface
                 ->booleanNode('enable_fos_user')->defaultValue(class_exists(FOSUserBundle::class))->info('Enable the FOSUserBundle integration.')->end()
                 ->booleanNode('enable_nelmio_api_doc')
                     ->defaultFalse()
-                    ->setDeprecated('Enabling the NelmioApiDocBundle integration has been deprecated in 2.2 and will be removed in 3.0. NelmioApiDocBundle 3 has native support for API Platform.')
+                    ->setDeprecated(...$this->buildDeprecationArgs('2.2', 'Enabling the NelmioApiDocBundle integration has been deprecated in 2.2 and will be removed in 3.0. NelmioApiDocBundle 3 has native support for API Platform.'))
                     ->info('Enable the NelmioApiDocBundle integration.')
                 ->end()
                 ->booleanNode('enable_swagger')->defaultTrue()->info('Enable the Swagger documentation and export.')->end()
@@ -248,6 +249,7 @@ final class Configuration implements ConfigurationInterface
                         ->scalarNode('flow')->defaultValue('application')->info('The oauth flow grant type.')->end()
                         ->scalarNode('tokenUrl')->defaultValue('/oauth/v2/token')->info('The oauth token url.')->end()
                         ->scalarNode('authorizationUrl')->defaultValue('/oauth/v2/auth')->info('The oauth authentication url.')->end()
+                        ->scalarNode('refreshUrl')->defaultValue('/oauth/v2/refresh')->info('The oauth refresh url.')->end()
                         ->arrayNode('scopes')
                             ->prototype('scalar')->end()
                         ->end()
@@ -295,7 +297,7 @@ final class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('versions')
-                            ->info('The active versions of OpenAPI to be exported or used in the swagger_ui. The first value is the default.')
+                            ->info('The active versions of Open API to be exported or used in the swagger_ui. The first value is the default.')
                             ->defaultValue($defaultVersions)
                             ->beforeNormalization()
                                 ->always(static function ($v) {
@@ -552,7 +554,7 @@ final class Configuration implements ConfigurationInterface
         $defaultsNode
             ->ignoreExtraKeys()
             ->beforeNormalization()
-            ->always(function (array $defaults) use ($nameConverter) {
+            ->always(static function (array $defaults) use ($nameConverter) {
                 $normalizedDefaults = [];
                 foreach ($defaults as $option => $value) {
                     $option = $nameConverter->normalize($option);
@@ -566,5 +568,12 @@ final class Configuration implements ConfigurationInterface
             $snakeCased = $nameConverter->normalize($attribute);
             $defaultsNode->children()->variableNode($snakeCased);
         }
+    }
+
+    private function buildDeprecationArgs(string $version, string $message): array
+    {
+        return method_exists(BaseNode::class, 'getDeprecation')
+            ? ['api-platform/core', $version, $message]
+            : [$message];
     }
 }

@@ -21,7 +21,7 @@ use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
-use Doctrine\Common\Inflector\Inflector;
+use ApiPlatform\Core\Util\Inflector;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\NullableType;
 use GraphQL\Type\Definition\Type as GraphQLType;
@@ -29,6 +29,7 @@ use GraphQL\Type\Definition\WrappingType;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidTypeException;
 use Symfony\Component\PropertyInfo\Type;
+use Symfony\Component\Serializer\NameConverter\AdvancedNameConverterInterface;
 use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 
 /**
@@ -94,10 +95,10 @@ final class FieldsBuilder implements FieldsBuilderInterface
     {
         $shortName = $resourceMetadata->getShortName();
         $fieldName = lcfirst('item_query' === $queryName ? $shortName : $queryName.$shortName);
+        $description = $resourceMetadata->getGraphqlAttribute($queryName, 'description');
+        $deprecationReason = (string) $resourceMetadata->getGraphqlAttribute($queryName, 'deprecation_reason', null, true);
 
-        $deprecationReason = (string) $resourceMetadata->getGraphqlAttribute($queryName, 'deprecation_reason', '', true);
-
-        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, null, $deprecationReason, new Type(Type::BUILTIN_TYPE_OBJECT, true, $resourceClass), $resourceClass, false, $queryName, null, null)) {
+        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, $description, $deprecationReason, new Type(Type::BUILTIN_TYPE_OBJECT, true, $resourceClass), $resourceClass, false, $queryName, null, null)) {
             $args = $this->resolveResourceArgs($configuration['args'] ?? [], $queryName, $shortName);
             $configuration['args'] = $args ?: $configuration['args'] ?? ['id' => ['type' => GraphQLType::nonNull(GraphQLType::id())]];
 
@@ -114,10 +115,10 @@ final class FieldsBuilder implements FieldsBuilderInterface
     {
         $shortName = $resourceMetadata->getShortName();
         $fieldName = lcfirst('collection_query' === $queryName ? $shortName : $queryName.$shortName);
+        $description = $resourceMetadata->getGraphqlAttribute($queryName, 'description');
+        $deprecationReason = (string) $resourceMetadata->getGraphqlAttribute($queryName, 'deprecation_reason', null, true);
 
-        $deprecationReason = (string) $resourceMetadata->getGraphqlAttribute($queryName, 'deprecation_reason', '', true);
-
-        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, null, $deprecationReason, new Type(Type::BUILTIN_TYPE_OBJECT, false, null, true, null, new Type(Type::BUILTIN_TYPE_OBJECT, false, $resourceClass)), $resourceClass, false, $queryName, null, null)) {
+        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, $description, $deprecationReason, new Type(Type::BUILTIN_TYPE_OBJECT, false, null, true, null, new Type(Type::BUILTIN_TYPE_OBJECT, false, $resourceClass)), $resourceClass, false, $queryName, null, null)) {
             $args = $this->resolveResourceArgs($configuration['args'] ?? [], $queryName, $shortName);
             $configuration['args'] = $args ?: $configuration['args'] ?? $fieldConfiguration['args'];
 
@@ -135,9 +136,10 @@ final class FieldsBuilder implements FieldsBuilderInterface
         $mutationFields = [];
         $shortName = $resourceMetadata->getShortName();
         $resourceType = new Type(Type::BUILTIN_TYPE_OBJECT, true, $resourceClass);
-        $deprecationReason = $resourceMetadata->getGraphqlAttribute($mutationName, 'deprecation_reason', '', true);
+        $description = $resourceMetadata->getGraphqlAttribute($mutationName, 'description', ucfirst("{$mutationName}s a $shortName."), false);
+        $deprecationReason = $resourceMetadata->getGraphqlAttribute($mutationName, 'deprecation_reason', null, true);
 
-        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, ucfirst("{$mutationName}s a $shortName."), $deprecationReason, $resourceType, $resourceClass, false, null, $mutationName, null)) {
+        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, $description, $deprecationReason, $resourceType, $resourceClass, false, null, $mutationName, null)) {
             $fieldConfiguration['args'] += ['input' => $this->getResourceFieldConfiguration(null, null, $deprecationReason, $resourceType, $resourceClass, true, null, $mutationName, null)];
         }
 
@@ -154,9 +156,10 @@ final class FieldsBuilder implements FieldsBuilderInterface
         $subscriptionFields = [];
         $shortName = $resourceMetadata->getShortName();
         $resourceType = new Type(Type::BUILTIN_TYPE_OBJECT, true, $resourceClass);
-        $deprecationReason = $resourceMetadata->getGraphqlAttribute($subscriptionName, 'deprecation_reason', '', true);
+        $description = $resourceMetadata->getGraphqlAttribute($subscriptionName, 'description', "Subscribes to the $subscriptionName event of a $shortName.", false);
+        $deprecationReason = $resourceMetadata->getGraphqlAttribute($subscriptionName, 'deprecation_reason', null, true);
 
-        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, "Subscribes to the $subscriptionName event of a $shortName.", $deprecationReason, $resourceType, $resourceClass, false, null, null, $subscriptionName)) {
+        if ($fieldConfiguration = $this->getResourceFieldConfiguration(null, $description, $deprecationReason, $resourceType, $resourceClass, false, null, null, $subscriptionName)) {
             $fieldConfiguration['args'] += ['input' => $this->getResourceFieldConfiguration(null, null, $deprecationReason, $resourceType, $resourceClass, true, null, null, $subscriptionName)];
         }
 
@@ -223,8 +226,8 @@ final class FieldsBuilder implements FieldsBuilderInterface
                     continue;
                 }
 
-                if ($fieldConfiguration = $this->getResourceFieldConfiguration($property, $propertyMetadata->getDescription(), $propertyMetadata->getAttribute('deprecation_reason', ''), $propertyType, $resourceClass, $input, $queryName, $mutationName, $subscriptionName, $depth)) {
-                    $fields['id' === $property ? '_id' : $this->normalizePropertyName($property)] = $fieldConfiguration;
+                if ($fieldConfiguration = $this->getResourceFieldConfiguration($property, $propertyMetadata->getDescription(), $propertyMetadata->getAttribute('deprecation_reason', null), $propertyType, $resourceClass, $input, $queryName, $mutationName, $subscriptionName, $depth)) {
+                    $fields['id' === $property ? '_id' : $this->normalizePropertyName($property, $resourceClass)] = $fieldConfiguration;
                 }
             }
         }
@@ -257,7 +260,7 @@ final class FieldsBuilder implements FieldsBuilderInterface
      *
      * @see http://webonyx.github.io/graphql-php/type-system/object-types/
      */
-    private function getResourceFieldConfiguration(?string $property, ?string $fieldDescription, string $deprecationReason, Type $type, string $rootResource, bool $input, ?string $queryName, ?string $mutationName, ?string $subscriptionName, int $depth = 0): ?array
+    private function getResourceFieldConfiguration(?string $property, ?string $fieldDescription, ?string $deprecationReason, Type $type, string $rootResource, bool $input, ?string $queryName, ?string $mutationName, ?string $subscriptionName, int $depth = 0): ?array
     {
         try {
             $resourceClass = $this->typeBuilder->isCollection($type) && ($collectionValueType = $type->getCollectionValueType()) ? $collectionValueType->getClassName() : $type->getClassName();
@@ -493,8 +496,15 @@ final class FieldsBuilder implements FieldsBuilderInterface
             : GraphQLType::nonNull($graphqlType);
     }
 
-    private function normalizePropertyName(string $property): string
+    private function normalizePropertyName(string $property, string $resourceClass): string
     {
-        return null !== $this->nameConverter ? $this->nameConverter->normalize($property) : $property;
+        if (null === $this->nameConverter) {
+            return $property;
+        }
+        if ($this->nameConverter instanceof AdvancedNameConverterInterface) {
+            return $this->nameConverter->normalize($property, $resourceClass);
+        }
+
+        return $this->nameConverter->normalize($property);
     }
 }

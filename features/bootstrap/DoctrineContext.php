@@ -11,6 +11,8 @@
 
 declare(strict_types=1);
 
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\AbsoluteUrlDummy as AbsoluteUrlDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\AbsoluteUrlRelationDummy as AbsoluteUrlRelationDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Address as AddressDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Answer as AnswerDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeItem as CompositeItemDocument;
@@ -35,6 +37,8 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDifferentGraphQlSer
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoCustom as DummyDtoCustomDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoNoInput as DummyDtoNoInputDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoNoOutput as DummyDtoNoOutputDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoOutputFallbackToSameClass as DummyDtoOutputFallbackToSameClassDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoOutputSameClass as DummyDtoOutputSameClassDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyFriend as DummyFriendDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyGroup as DummyGroupDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyMercure as DummyMercureDocument;
@@ -50,6 +54,8 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FooDummy as FooDummyDocu
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\FourthLevel as FourthLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Greeting as GreetingDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\MaxDepthDummy as MaxDepthDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\NetworkPathDummy as NetworkPathDummyDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\NetworkPathRelationDummy as NetworkPathRelationDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Order as OrderDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Person as PersonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\PersonToPet as PersonToPetDocument;
@@ -65,14 +71,16 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\SecuredDummy as SecuredD
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\SoMany as SoManyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Taxon as TaxonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ThirdLevel as ThirdLevelDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\UrlEncodedId as UrlEncodedIdDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\User as UserDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlRelationDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Address;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Answer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeLabel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositePrimitiveItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeRelation;
-use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Container;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedBoolean;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedDate;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedInteger;
@@ -91,6 +99,8 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDifferentGraphQlSeria
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoCustom;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoNoInput;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoNoOutput;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoOutputFallbackToSameClass;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyDtoOutputSameClass;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyFriend;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyGroup;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyImmutableDate;
@@ -109,7 +119,8 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\FourthLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Greeting;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\InternalUser;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\MaxDepthDummy;
-use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Node;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\NetworkPathDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\NetworkPathRelationDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Order;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Person;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PersonToPet;
@@ -127,6 +138,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Site;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\SoMany;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Taxon;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ThirdLevel;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UrlEncodedId;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\User;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UuidIdentifierDummy;
 use Behat\Behat\Context\Context;
@@ -1054,22 +1066,14 @@ final class DoctrineContext implements Context
     }
 
     /**
-     * @Given there are :nb nodes in a container :uuid
+     * @Given there is a UrlEncodedId resource
      */
-    public function thereAreNodesInAContainer(int $nb, string $uuid)
+    public function thereIsAUrlEncodedIdResource()
     {
-        $container = new Container();
-        $container->setId($uuid);
-        $this->manager->persist($container);
-
-        for ($i = 0; $i < $nb; ++$i) {
-            $node = new Node();
-            $node->setContainer($container);
-            $node->setSerial($i);
-            $this->manager->persist($node);
-        }
-
+        $urlEncodedIdResource = ($this->isOrm() ? new UrlEncodedId() : new UrlEncodedIdDocument());
+        $this->manager->persist($urlEncodedIdResource);
         $this->manager->flush();
+        $this->manager->clear();
     }
 
     /**
@@ -1382,6 +1386,32 @@ final class DoctrineContext implements Context
     }
 
     /**
+     * @Given there is a DummyDtoOutputSameClass
+     */
+    public function thereIsADummyDtoOutputSameClass()
+    {
+        $dto = $this->isOrm() ? new DummyDtoOutputSameClass() : new DummyDtoOutputSameClassDocument();
+        $dto->lorem = 'test';
+        $dto->ipsum = '1';
+        $this->manager->persist($dto);
+        $this->manager->flush();
+        $this->manager->clear();
+    }
+
+    /**
+     * @Given there is a DummyDtoOutputFallbackToSameClass
+     */
+    public function thereIsADummyDtoOutputFallbackToSameClass()
+    {
+        $dto = $this->isOrm() ? new DummyDtoOutputFallbackToSameClass() : new DummyDtoOutputFallbackToSameClassDocument();
+        $dto->lorem = 'test';
+        $dto->ipsum = '1';
+        $this->manager->persist($dto);
+        $this->manager->flush();
+        $this->manager->clear();
+    }
+
+    /**
      * @Given there is an order with same customer and recipient
      */
     public function thereIsAnOrderWithSameCustomerAndRecipient()
@@ -1474,7 +1504,7 @@ final class DoctrineContext implements Context
         $product = $this->isOrm() ? new Product() : new ProductDocument();
         $product->setCode($data['code']);
         if (isset($data['mainTaxon'])) {
-            $mainTaxonCode = str_replace('/taxons/', '', $data['mainTaxon']);
+            $mainTaxonCode = str_replace('/taxa/', '', $data['mainTaxon']);
             $mainTaxon = $this->manager->getRepository($this->isOrm() ? Taxon::class : TaxonDocument::class)->findOneBy([
                 'code' => $mainTaxonCode,
             ]);
@@ -1520,6 +1550,40 @@ final class DoctrineContext implements Context
 
             $this->manager->persist($relatedDummy);
             $this->manager->persist($dummyMercure);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb absoluteUrlDummy objects with a related absoluteUrlRelationDummy
+     */
+    public function thereAreAbsoluteUrlDummies(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $absoluteUrlRelationDummy = $this->buildAbsoluteUrlRelationDummy();
+            $absoluteUrlDummy = $this->buildAbsoluteUrlDummy();
+            $absoluteUrlDummy->absoluteUrlRelationDummy = $absoluteUrlRelationDummy;
+
+            $this->manager->persist($absoluteUrlRelationDummy);
+            $this->manager->persist($absoluteUrlDummy);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb networkPathDummy objects with a related networkPathRelationDummy
+     */
+    public function thereAreNetworkPathDummies(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $networkPathRelationDummy = $this->buildNetworkPathRelationDummy();
+            $networkPathDummy = $this->buildNetworkPathDummy();
+            $networkPathDummy->networkPathRelationDummy = $networkPathRelationDummy;
+
+            $this->manager->persist($networkPathRelationDummy);
+            $this->manager->persist($networkPathDummy);
         }
 
         $this->manager->flush();
@@ -1909,5 +1973,37 @@ final class DoctrineContext implements Context
     private function buildDummyMercure()
     {
         return $this->isOrm() ? new DummyMercure() : new DummyMercureDocument();
+    }
+
+    /**
+     * @return AbsoluteUrlDummyDocument|AbsoluteUrlDummy
+     */
+    private function buildAbsoluteUrlDummy()
+    {
+        return $this->isOrm() ? new AbsoluteUrlDummy() : new AbsoluteUrlDummyDocument();
+    }
+
+    /**
+     * @return AbsoluteUrlRelationDummyDocument|AbsoluteUrlRelationDummy
+     */
+    private function buildAbsoluteUrlRelationDummy()
+    {
+        return $this->isOrm() ? new AbsoluteUrlRelationDummy() : new AbsoluteUrlRelationDummyDocument();
+    }
+
+    /**
+     * @return NetworkPathDummyDocument|NetworkPathDummy
+     */
+    private function buildNetworkPathDummy()
+    {
+        return $this->isOrm() ? new NetworkPathDummy() : new NetworkPathDummyDocument();
+    }
+
+    /**
+     * @return NetworkPathRelationDummyDocument|NetworkPathRelationDummy
+     */
+    private function buildNetworkPathRelationDummy()
+    {
+        return $this->isOrm() ? new NetworkPathRelationDummy() : new NetworkPathRelationDummyDocument();
     }
 }
