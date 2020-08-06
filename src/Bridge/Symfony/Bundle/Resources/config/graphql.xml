@@ -263,6 +263,7 @@
             <argument type="service" id="api_platform.graphql.subscription.subscription_identifier_generator" />
             <argument type="service" id="api_platform.graphql.resolver.stage.serialize" />
             <argument type="service" id="api_platform.iri_converter" />
+            <argument type="service" id="api_platform.metadata.resource.metadata_factory" />
         </service>
 
         <service id="api_platform.graphql.subscription.subscription_identifier_generator" class="ApiPlatform\Core\GraphQl\Subscription\SubscriptionIdentifierGenerator" />

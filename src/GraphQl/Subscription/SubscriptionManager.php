@@ -16,6 +16,7 @@ namespace ApiPlatform\Core\GraphQl\Subscription;
 use ApiPlatform\Core\Api\IriConverterInterface;
 use ApiPlatform\Core\GraphQl\Resolver\Stage\SerializeStageInterface;
 use ApiPlatform\Core\GraphQl\Resolver\Util\IdentifierTrait;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Util\ResourceClassInfoTrait;
 use ApiPlatform\Core\Util\SortTrait;
 use GraphQL\Type\Definition\ResolveInfo;
@@ -39,13 +40,15 @@ final class SubscriptionManager implements SubscriptionManagerInterface
     private $subscriptionIdentifierGenerator;
     private $serializeStage;
     private $iriConverter;
+    private $resourceMetadataFactory;
 
-    public function __construct(CacheItemPoolInterface $subscriptionsCache, SubscriptionIdentifierGeneratorInterface $subscriptionIdentifierGenerator, SerializeStageInterface $serializeStage, IriConverterInterface $iriConverter)
+    public function __construct(CacheItemPoolInterface $subscriptionsCache, SubscriptionIdentifierGeneratorInterface $subscriptionIdentifierGenerator, SerializeStageInterface $serializeStage, IriConverterInterface $iriConverter, ResourceMetadataFactoryInterface $resourceMetadataFactory)
     {
         $this->subscriptionsCache = $subscriptionsCache;
         $this->subscriptionIdentifierGenerator = $subscriptionIdentifierGenerator;
         $this->serializeStage = $serializeStage;
         $this->iriConverter = $iriConverter;
+        $this->resourceMetadataFactory = $resourceMetadataFactory;
     }
 
     public function retrieveSubscriptionId(array $context, ?array $result): ?string
@@ -93,6 +96,10 @@ final class SubscriptionManager implements SubscriptionManagerInterface
             $resolverContext = ['fields' => $subscriptionFields, 'is_collection' => false, 'is_mutation' => false, 'is_subscription' => true];
 
             $data = ($this->serializeStage)($object, $resourceClass, 'update', $resolverContext);
+
+            $rootObject = array_keys($data)[0];
+            $data[$rootObject]['__typename'] = $this->resourceMetadataFactory->create($resourceClass)->getShortName();
+            $data[$rootObject]['id'] = $iri;
             unset($data['clientSubscriptionId']);
 
             if ($data !== $subscriptionResult) {
