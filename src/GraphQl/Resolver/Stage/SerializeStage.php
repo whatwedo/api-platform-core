@@ -79,8 +79,6 @@ final class SerializeStage implements SerializeStageInterface
 
         $normalizationContext = $this->serializerContextBuilder->create($resourceClass, $operationName, $context, true);
 
-        $args = $context['args'];
-
         $data = null;
         if (!$isCollection) {
             if ($isMutation && 'delete' === $operationName) {
