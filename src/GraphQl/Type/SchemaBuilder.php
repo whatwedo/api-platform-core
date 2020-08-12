@@ -85,6 +85,12 @@ final class SchemaBuilder implements SchemaBuilderInterface
                     continue;
                 }
 
+                // TODO: figure out if we can support subscriptions and mutations on interfaces
+                $isInterface = (new \ReflectionClass($resourceClass))->isAbstract();
+                if($isInterface) {
+                    continue;
+                }
+
                 if ('update' === $operationName) {
                     $subscriptionFields += $this->fieldsBuilder->getSubscriptionFields($resourceClass, $resourceMetadata, $operationName);
                 }

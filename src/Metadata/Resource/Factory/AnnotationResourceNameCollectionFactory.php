@@ -54,9 +54,15 @@ final class AnnotationResourceNameCollectionFactory implements ResourceNameColle
 
         foreach (ReflectionClassRecursiveIterator::getReflectionClassesFromDirectories($this->paths) as $className => $reflectionClass) {
             if ($this->reader->getClassAnnotation($reflectionClass, ApiResource::class)) {
-                $classes[$className] = true;
+                $classes[$className]['enabled'] = true;
+                $classes[$className]['abstract'] = $reflectionClass->isAbstract();
             }
         }
+
+        // interfaces need to be loaded first, so they exist in the type container already
+        \uasort($classes, static function (array $a, array $b) {
+            return $b['abstract'];
+        });
 
         return new ResourceNameCollection(array_keys($classes));
     }
