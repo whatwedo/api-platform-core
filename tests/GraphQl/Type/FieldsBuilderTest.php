@@ -28,8 +28,10 @@ use ApiPlatform\Core\Metadata\Property\SubresourceMetadata;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Serializer\NameConverter\CustomConverter;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\InterfaceType;
+use GraphQL\Type\Definition\ListOfType;
 use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\Type as GraphQLType;
@@ -45,6 +47,8 @@ use Symfony\Component\Serializer\NameConverter\AdvancedNameConverterInterface;
  */
 class FieldsBuilderTest extends TestCase
 {
+    use ProphecyTrait;
+
     /** @var ObjectProphecy */
     private $propertyNameCollectionFactoryProphecy;
 
@@ -230,8 +234,8 @@ class FieldsBuilderTest extends TestCase
         $this->filterLocatorProphecy->get('my_filter')->willReturn($filterProphecy->reveal());
         $this->typesContainerProphecy->has('ShortNameFilter_dateField')->willReturn(false);
         $this->typesContainerProphecy->has('ShortNameFilter_parent__child')->willReturn(false);
-        $this->typesContainerProphecy->set('ShortNameFilter_dateField', Argument::type(InputObjectType::class));
-        $this->typesContainerProphecy->set('ShortNameFilter_parent__child', Argument::type(InputObjectType::class));
+        $this->typesContainerProphecy->set('ShortNameFilter_dateField', Argument::type(ListOfType::class));
+        $this->typesContainerProphecy->set('ShortNameFilter_parent__child', Argument::type(ListOfType::class));
 
         $queryFields = $this->fieldsBuilder->getCollectionQueryFields($resourceClass, $resourceMetadata, $queryName, $configuration);
 
@@ -296,8 +300,8 @@ class FieldsBuilderTest extends TestCase
                             ],
                             'boolField' => $graphqlType,
                             'boolField_list' => GraphQLType::listOf($graphqlType),
-                            'parent__child' => new InputObjectType(['name' => 'ShortNameFilter_parent__child', 'fields' => ['related__nested' => $graphqlType]]),
-                            'dateField' => new InputObjectType(['name' => 'ShortNameFilter_dateField', 'fields' => ['before' => $graphqlType]]),
+                            'parent__child' => GraphQLType::listOf(new InputObjectType(['name' => 'ShortNameFilter_parent__child', 'fields' => ['related__nested' => $graphqlType]])),
+                            'dateField' => GraphQLType::listOf(new InputObjectType(['name' => 'ShortNameFilter_dateField', 'fields' => ['before' => $graphqlType]])),
                         ],
                         'resolve' => $resolver,
                         'deprecationReason' => null,
@@ -348,11 +352,11 @@ class FieldsBuilderTest extends TestCase
                             ],
                             'boolField' => $graphqlType,
                             'boolField_list' => GraphQLType::listOf($graphqlType),
-                            'parent__child' => new InputObjectType(['name' => 'ShortNameFilter_parent__child', 'fields' => ['related__nested' => $graphqlType]]),
-                            'dateField' => new InputObjectType(['name' => 'ShortNameFilter_dateField', 'fields' => ['before' => $graphqlType]]),
+                            'parent__child' => GraphQLType::listOf(new InputObjectType(['name' => 'ShortNameFilter_parent__child', 'fields' => ['related__nested' => $graphqlType]])),
+                            'dateField' => GraphQLType::listOf(new InputObjectType(['name' => 'ShortNameFilter_dateField', 'fields' => ['before' => $graphqlType]])),
                         ],
                         'resolve' => $resolver,
-                        'deprecationReason' => '',
+                        'deprecationReason' => null,
                     ],
                 ],
             ],
@@ -411,11 +415,11 @@ class FieldsBuilderTest extends TestCase
                                 'description' => null,
                                 'args' => [],
                                 'resolve' => null,
-                                'deprecationReason' => '',
+                                'deprecationReason' => null,
                             ],
                         ],
                         'resolve' => $mutationResolver,
-                        'deprecationReason' => '',
+                        'deprecationReason' => null,
                     ],
                 ],
             ],
@@ -564,7 +568,7 @@ class FieldsBuilderTest extends TestCase
                         'description' => null,
                         'args' => [],
                         'resolve' => null,
-                        'deprecationReason' => '',
+                        'deprecationReason' => null,
                     ],
                 ],
                 $advancedNameConverter->reveal(),
@@ -707,7 +711,7 @@ class FieldsBuilderTest extends TestCase
                         'description' => null,
                         'args' => [],
                         'resolve' => null,
-                        'deprecationReason' => '',
+                        'deprecationReason' => null,
                     ],
                 ],
             ],

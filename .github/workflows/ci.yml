@@ -113,11 +113,17 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        env:
+          SYMFONY_PHPUNIT_VERSION: '9.4'
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -133,7 +139,9 @@ jobs:
             phpstan-
         continue-on-error: true
       - name: Run PHPStan analysis
-        run: vendor/bin/phpstan analyse --ansi
+        env:
+          SYMFONY_PHPUNIT_VERSION: '9.4'
+        run: vendor/bin/phpstan analyse --no-progress --no-interaction --ansi
 
   phpunit:
     name: PHPUnit (PHP ${{ matrix.php }})
@@ -229,11 +237,16 @@ jobs:
           composer remove --dev --no-progress --no-update --ansi \
             doctrine/mongodb-odm \
             doctrine/mongodb-odm-bundle \
+      - name: Require Symfony Uid
+        if: (!startsWith(matrix.php, '7.1'))
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -246,9 +259,9 @@ jobs:
         run: |
           mkdir -p build/logs/phpunit
           if [ "$COVERAGE" = '1' ]; then
-            vendor/bin/phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always
+            vendor/bin/simple-phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always
           else
-            vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+            vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
           fi
       - name: Upload test artifacts
         if: always()
@@ -369,11 +382,16 @@ jobs:
           composer remove --dev --no-progress --no-update --ansi \
             doctrine/mongodb-odm \
             doctrine/mongodb-odm-bundle \
+      - name: Require Symfony Uid
+        if: (!startsWith(matrix.php, '7.1'))
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -382,6 +400,8 @@ jobs:
       - name: Enable code coverage
         if: matrix.coverage
         run: echo '::set-env name=COVERAGE::1'
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Run Behat tests
         run: |
           mkdir -p build/logs/behat
@@ -509,11 +529,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --prefer-stable --prefer-lowest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -522,7 +546,7 @@ jobs:
       - name: Run PHPUnit tests
         run: |
           mkdir -p build/logs/phpunit
-          vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v1
@@ -599,6 +623,10 @@ jobs:
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --prefer-stable --prefer-lowest --ansi
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -742,6 +770,8 @@ jobs:
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -813,6 +843,7 @@ jobs:
       - name: Install system packages
         run: |
           apk add \
+            git \
             unzip \
       - name: Cache mongodb PHP extension build
         uses: actions/cache@v2
@@ -862,6 +893,8 @@ jobs:
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --prefer-stable --prefer-lowest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -966,11 +999,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -979,7 +1016,7 @@ jobs:
       - name: Run PHPUnit tests
         run: |
           mkdir -p build/logs/phpunit
-          vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v1
@@ -1075,11 +1112,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1208,11 +1249,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1221,7 +1266,7 @@ jobs:
       - name: Run PHPUnit tests
         run: |
           mkdir -p build/logs/phpunit
-          vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v1
@@ -1317,11 +1362,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1463,6 +1512,10 @@ jobs:
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1475,9 +1528,9 @@ jobs:
         run: |
           mkdir -p build/logs/phpunit
           if [ "$COVERAGE" = '1' ]; then
-            vendor/bin/phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always --configuration phpunit_mongodb.xml
+            vendor/bin/simple-phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always --configuration phpunit_mongodb.xml
           else
-            vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always --configuration phpunit_mongodb.xml
+            vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always --configuration phpunit_mongodb.xml
           fi
       - name: Upload test artifacts
         if: always()
@@ -1599,11 +1652,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1773,11 +1830,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -1790,9 +1851,9 @@ jobs:
         run: |
           mkdir -p build/logs/phpunit
           if [ "$COVERAGE" = '1' ]; then
-            vendor/bin/phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always
+            vendor/bin/simple-phpunit --coverage-clover build/logs/phpunit/clover.xml --log-junit build/logs/phpunit/junit.xml --colors=always
           else
-            vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+            vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
           fi
       - name: Upload test artifacts
         if: always()
@@ -1916,11 +1977,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -2008,7 +2073,7 @@ jobs:
       fail-fast: false
     timeout-minutes: 20
     env:
-      SYMFONY_DEPRECATIONS_HELPER: max[total]=5
+      SYMFONY_DEPRECATIONS_HELPER: max[total]=7
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -2057,11 +2122,15 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Update project dependencies
         run: |
           mkdir -p /tmp/api-platform/core/vendor
           ln -s /tmp/api-platform/core/vendor vendor
           composer update --no-progress --no-suggest --ansi
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -2070,7 +2139,7 @@ jobs:
       - name: Run PHPUnit tests
         run: |
           mkdir -p build/logs/phpunit
-          vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v1
@@ -2092,7 +2161,7 @@ jobs:
         php:
           - '7.4'
         symfony:
-          - '5.1'
+          - '5.2'
       fail-fast: false
     timeout-minutes: 20
     steps:
@@ -2146,6 +2215,8 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Allow unstable project dependencies
         run: |
           jq '. + {"minimum-stability": "dev"}' composer.json | sponge composer.json
@@ -2168,6 +2239,8 @@ jobs:
           symfony_packages=$(composer show symfony/* | tr -s ' ' '\t' | cut -f1-2 | grep -vE 'polyfill|contracts|mercure')
           ! echo "$symfony_packages" | grep -vE "$version_pattern"
         continue-on-error: true
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -2176,7 +2249,7 @@ jobs:
       - name: Run PHPUnit tests
         run: |
           mkdir -p build/logs/phpunit
-          vendor/bin/phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v1
@@ -2198,7 +2271,7 @@ jobs:
         php:
           - '7.4'
         symfony:
-          - '5.1'
+          - '5.2'
       fail-fast: false
     timeout-minutes: 20
     steps:
@@ -2252,6 +2325,8 @@ jobs:
         run: |
           composer global require --prefer-dist --no-progress --no-suggest --ansi \
             symfony/flex
+      - name: Require Symfony Uid
+        run: composer require symfony/uid --dev --no-progress --ansi
       - name: Allow unstable project dependencies
         run: |
           jq '. + {"minimum-stability": "dev"}' composer.json | sponge composer.json
@@ -2274,6 +2349,8 @@ jobs:
           symfony_packages=$(composer show symfony/* | tr -s ' ' '\t' | cut -f1-2 | grep -vE 'polyfill|contracts|mercure')
           ! echo "$symfony_packages" | grep -vE "$version_pattern"
         continue-on-error: true
+      - name: Install PHPUnit
+        run: vendor/bin/simple-phpunit --version
       - name: Clear test app cache
         run: |
           mkdir -p /tmp/api-platform/core/var
@@ -2290,3 +2367,78 @@ jobs:
           name: behat-logs-php${{ matrix.php }}-symfony${{ matrix.symfony }}
           path: build/logs/behat
         continue-on-error: true
+
+  windows-phpunit:
+    name: Windows PHPUnit (PHP 7.4) (SQLite)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      APP_ENV: sqlite
+      DATABASE_URL: sqlite:///%kernel.project_dir%/var/data.db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Setup PHP with pre-release PECL extension
+        uses: shivammathur/setup-php@v2
+        with:
+            php-version: '7.4'
+            tools: pecl, composer, flex
+            extensions: intl, openssl, mbstring, pdo_sqlite 
+            coverage: none
+            ini-values: memory_limit=-1
+      - name: Cache Composer packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.composer/cache
+          key: composer-php${{ matrix.php }}-${{ github.sha }}
+          restore-keys: |
+            composer-php${{ matrix.php }}-
+            composer-
+        continue-on-error: true
+      - name: Update project dependencies
+        run: |
+          composer update --no-progress --no-suggest --ansi
+      - name: Clear test app cache
+        run: |
+          tests/Fixtures/app/console cache:clear --ansi
+      - name: Run PHPUnit tests
+        run: |
+          vendor/bin/simple-phpunit --log-junit build/logs/phpunit/junit.xml --colors=always
+
+  windows-behat:
+    name: Windows Behat (PHP 7.4) (SQLite)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: sqlite
+      DATABASE_URL: sqlite:///%kernel.project_dir%/var/data.db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Setup PHP with pre-release PECL extension
+        uses: shivammathur/setup-php@v2
+        with:
+            php-version: '7.4'
+            tools: pecl, composer, flex
+            extensions: intl, openssl, mbstring, pdo_sqlite 
+            coverage: none
+            ini-values: memory_limit=-1
+      - name: Cache Composer packages
+        uses: actions/cache@v2
+        with:
+          path: ~/.composer/cache
+          key: composer-php${{ matrix.php }}-${{ github.sha }}
+          restore-keys: |
+            composer-php${{ matrix.php }}-
+            composer-
+        continue-on-error: true
+      - name: Update project dependencies
+        run: |
+          composer update --no-progress --no-suggest --ansi
+          vendor/bin/simple-phpunit --version
+      - name: Clear test app cache
+        run: |
+          tests/Fixtures/app/console cache:clear --ansi
+      - name: Run Behat tests
+        run: |
+          vendor/bin/behat --format=progress --profile=default --no-interaction --colors

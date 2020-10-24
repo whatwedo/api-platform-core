@@ -95,6 +95,13 @@ final class ContextBuilder implements AnonymousContextBuilderInterface
             return [];
         }
 
+        if ($resourceMetadata->getAttribute('normalization_context')['iri_only'] ?? false) {
+            $context = $this->getBaseContext($referenceType);
+            $context['hydra:member']['@type'] = '@id';
+
+            return $context;
+        }
+
         return $this->getResourceContextWithShortname($resourceClass, $referenceType, $shortName);
     }
 
@@ -128,6 +135,10 @@ final class ContextBuilder implements AnonymousContextBuilderInterface
             '@type' => $shortName,
             '@id' => $context['iri'] ?? '_:'.(\function_exists('spl_object_id') ? spl_object_id($object) : spl_object_hash($object)),
         ];
+
+        if ($context['has_context'] ?? false) {
+            unset($jsonLdContext['@context']);
+        }
 
         // here the object can be different from the resource given by the $context['api_resource'] value
         if (isset($context['api_resource'])) {

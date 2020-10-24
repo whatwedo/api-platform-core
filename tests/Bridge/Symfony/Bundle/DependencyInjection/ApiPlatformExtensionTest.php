@@ -63,6 +63,7 @@ use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
 use ApiPlatform\Core\DataProvider\Pagination;
 use ApiPlatform\Core\DataProvider\PaginationOptions;
 use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
+use ApiPlatform\Core\DataTransformer\DataTransformerInitializerInterface;
 use ApiPlatform\Core\DataTransformer\DataTransformerInterface;
 use ApiPlatform\Core\Exception\FilterValidationException;
 use ApiPlatform\Core\Exception\InvalidArgumentException;
@@ -86,6 +87,7 @@ use ApiPlatform\Core\Serializer\Filter\GroupFilter;
 use ApiPlatform\Core\Serializer\Filter\PropertyFilter;
 use ApiPlatform\Core\Serializer\SerializerContextBuilderInterface;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\TestBundle;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use ApiPlatform\Core\Validator\ValidatorInterface;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Doctrine\ORM\OptimisticLockException;
@@ -112,6 +114,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBa
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
+use Symfony\Component\Uid\AbstractUid;
 
 /**
  * @group resource-hog
@@ -120,6 +123,8 @@ use Symfony\Component\Serializer\Exception\ExceptionInterface;
  */
 class ApiPlatformExtensionTest extends TestCase
 {
+    use ProphecyTrait;
+
     public const DEFAULT_CONFIG = ['api_platform' => [
         'title' => 'title',
         'description' => 'description',
@@ -153,6 +158,7 @@ class ApiPlatformExtensionTest extends TestCase
         ],
         'defaults' => [
             'attributes' => [],
+            'stateless' => true,
         ],
     ]];
 
@@ -320,7 +326,6 @@ class ApiPlatformExtensionTest extends TestCase
 
     /**
      * @group legacy
-     * @expectedDeprecation Enabling the NelmioApiDocBundle integration has been deprecated in 2.2 and will be removed in 3.0. NelmioApiDocBundle 3 has native support for API Platform.
      */
     public function testEnableNelmioApiDoc()
     {
@@ -460,7 +465,7 @@ class ApiPlatformExtensionTest extends TestCase
     public function testResourcesToWatchWithUnsupportedMappingType()
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageRegExp('/Unsupported mapping type in ".+", supported types are XML & YAML\\./');
+        $this->expectExceptionMessageMatches('/Unsupported mapping type in ".+", supported types are XML & YAML\\./');
 
         $config = self::DEFAULT_CONFIG;
         $config['api_platform']['mapping']['paths'] = [__FILE__];
@@ -716,7 +721,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->registerForAutoconfiguration(RequestBodySearchCollectionExtensionInterface::class)->willReturn($this->childDefinitionProphecy)->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.elasticsearch.hosts', ['http://elasticsearch:9200'])->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.elasticsearch.mapping', [])->shouldBeCalled();
-        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => []])->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => ['stateless' => true]])->shouldBeCalled();
 
         $config = self::DEFAULT_CONFIG;
         $config['api_platform']['elasticsearch'] = [
@@ -867,7 +872,7 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.http_cache.vary' => ['Accept'],
             'api_platform.http_cache.public' => null,
             'api_platform.http_cache.invalidation.max_header_length' => 7500,
-            'api_platform.defaults' => ['attributes' => []],
+            'api_platform.defaults' => ['attributes' => ['stateless' => true]],
             'api_platform.enable_entrypoint' => true,
             'api_platform.enable_docs' => true,
             'api_platform.url_generation_strategy' => 1,
@@ -983,6 +988,11 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.subresource_operation_factory',
             'api_platform.subresource_operation_factory.cached',
         ];
+
+        if (class_exists(AbstractUid::class)) {
+            $definitions[] = 'api_platform.identifier.symfony_ulid_normalizer';
+            $definitions[] = 'api_platform.identifier.symfony_uuid_normalizer';
+        }
 
         foreach ($definitions as $definition) {
             $containerBuilderProphecy->setDefinition($definition, Argument::type(Definition::class))->shouldBeCalled();
@@ -1137,7 +1147,11 @@ class ApiPlatformExtensionTest extends TestCase
 
         $containerBuilderProphecy->registerForAutoconfiguration(DataTransformerInterface::class)
             ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
-        $this->childDefinitionProphecy->addTag('api_platform.data_transformer')->shouldBeCalledTimes(1);
+
+        $containerBuilderProphecy->registerForAutoconfiguration(DataTransformerInitializerInterface::class)
+            ->willReturn($this->childDefinitionProphecy)->shouldBeCalledTimes(1);
+
+        $this->childDefinitionProphecy->addTag('api_platform.data_transformer')->shouldBeCalledTimes(2);
 
         $containerBuilderProphecy->addResource(Argument::type(DirectoryResource::class))->shouldBeCalled();
 
@@ -1162,7 +1176,7 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.resource_class_directories' => Argument::type('array'),
             'api_platform.validator.serialize_payload_fields' => [],
             'api_platform.elasticsearch.enabled' => false,
-            'api_platform.defaults' => ['attributes' => []],
+            'api_platform.defaults' => ['attributes' => ['stateless' => true]],
         ];
 
         if ($hasSwagger) {

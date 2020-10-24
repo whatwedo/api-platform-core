@@ -30,6 +30,7 @@ use ApiPlatform\Core\DataPersister\DataPersisterInterface;
 use ApiPlatform\Core\DataProvider\CollectionDataProviderInterface;
 use ApiPlatform\Core\DataProvider\ItemDataProviderInterface;
 use ApiPlatform\Core\DataProvider\SubresourceDataProviderInterface;
+use ApiPlatform\Core\DataTransformer\DataTransformerInitializerInterface;
 use ApiPlatform\Core\DataTransformer\DataTransformerInterface;
 use ApiPlatform\Core\GraphQl\Error\ErrorHandlerInterface;
 use ApiPlatform\Core\GraphQl\Resolver\MutationResolverInterface;
@@ -53,6 +54,7 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpClient\HttpClientTrait;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
+use Symfony\Component\Uid\AbstractUid;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Yaml\Yaml;
 
@@ -167,6 +169,10 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             $loader->load('ramsey_uuid.xml');
         }
 
+        if (class_exists(AbstractUid::class)) {
+            $loader->load('symfony_uid.xml');
+        }
+
         $container->setParameter('api_platform.enable_entrypoint', $config['enable_entrypoint']);
         $container->setParameter('api_platform.enable_docs', $config['enable_docs']);
         $container->setParameter('api_platform.title', $config['title']);
@@ -249,6 +255,11 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             } else {
                 $normalizedDefaults['attributes'][$option] = $value;
             }
+        }
+
+        if (!\array_key_exists('stateless', $defaults)) {
+            @trigger_error('Not setting the "api_platform.defaults.stateless" configuration is deprecated since API Platform 2.6 and it will default to `true` in 3.0. You can override this at the operation level if you have stateful operations (highly not recommended).', E_USER_DEPRECATED);
+            $normalizedDefaults['attributes']['stateless'] = false;
         }
 
         return $normalizedDefaults;
@@ -682,6 +693,9 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
     private function registerDataTransformerConfiguration(ContainerBuilder $container): void
     {
         $container->registerForAutoconfiguration(DataTransformerInterface::class)
+            ->addTag('api_platform.data_transformer');
+
+        $container->registerForAutoconfiguration(DataTransformerInitializerInterface::class)
             ->addTag('api_platform.data_transformer');
     }
 

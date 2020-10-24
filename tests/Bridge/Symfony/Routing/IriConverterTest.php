@@ -31,6 +31,7 @@ use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
@@ -41,6 +42,8 @@ use Symfony\Component\Routing\RouterInterface;
  */
 class IriConverterTest extends TestCase
 {
+    use ProphecyTrait;
+
     public function testGetItemFromIriNoRouteException()
     {
         $this->expectException(InvalidArgumentException::class);
@@ -141,7 +144,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::COLLECTION)->willReturn('dummies');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('dummies', [], null)->willReturn('/dummies');
+        $routerProphecy->generate('dummies', [], UrlGeneratorInterface::ABS_PATH)->willReturn('/dummies');
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $this->assertEquals($converter->getIriFromResourceClass(Dummy::class), '/dummies');
@@ -171,7 +174,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::COLLECTION)->willReturn('dummies');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('dummies', [], null)->willThrow(new RouteNotFoundException());
+        $routerProphecy->generate('dummies', [], UrlGeneratorInterface::ABS_PATH)->willThrow(new RouteNotFoundException());
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $converter->getIriFromResourceClass(Dummy::class);
@@ -183,7 +186,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::SUBRESOURCE, Argument::type('array'))->willReturn('api_dummies_related_dummies_get_subresource');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('api_dummies_related_dummies_get_subresource', ['id' => 1], null)->willReturn('/dummies/1/related_dummies');
+        $routerProphecy->generate('api_dummies_related_dummies_get_subresource', ['id' => 1], UrlGeneratorInterface::ABS_PATH)->willReturn('/dummies/1/related_dummies');
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $this->assertEquals($converter->getSubresourceIriFromResourceClass(Dummy::class, ['subresource_identifiers' => ['id' => 1], 'subresource_resources' => [RelatedDummy::class => 1]]), '/dummies/1/related_dummies');
@@ -198,7 +201,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::SUBRESOURCE, Argument::type('array'))->willReturn('dummies');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('dummies', ['id' => 1], null)->willThrow(new RouteNotFoundException());
+        $routerProphecy->generate('dummies', ['id' => 1], UrlGeneratorInterface::ABS_PATH)->willThrow(new RouteNotFoundException());
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $converter->getSubresourceIriFromResourceClass(Dummy::class, ['subresource_identifiers' => ['id' => 1], 'subresource_resources' => [RelatedDummy::class => 1]]);
@@ -210,7 +213,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::ITEM)->willReturn('api_dummies_get_item');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('api_dummies_get_item', ['id' => 1], null)->willReturn('/dummies/1');
+        $routerProphecy->generate('api_dummies_get_item', ['id' => 1], UrlGeneratorInterface::ABS_PATH)->willReturn('/dummies/1');
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $this->assertEquals($converter->getItemIriFromResourceClass(Dummy::class, ['id' => 1]), '/dummies/1');
@@ -240,7 +243,7 @@ class IriConverterTest extends TestCase
         $routeNameResolverProphecy->getRouteName(Dummy::class, OperationType::ITEM)->willReturn('dummies');
 
         $routerProphecy = $this->prophesize(RouterInterface::class);
-        $routerProphecy->generate('dummies', ['id' => 1], null)->willThrow(new RouteNotFoundException());
+        $routerProphecy->generate('dummies', ['id' => 1], UrlGeneratorInterface::ABS_PATH)->willThrow(new RouteNotFoundException());
 
         $converter = $this->getIriConverter($routerProphecy, $routeNameResolverProphecy);
         $converter->getItemIriFromResourceClass(Dummy::class, ['id' => 1]);
