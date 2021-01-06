@@ -30,6 +30,7 @@ use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\PropertyInfo\Type;
+use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 
 class SchemaFactoryTest extends TestCase
 {
@@ -57,8 +58,8 @@ class SchemaFactoryTest extends TestCase
         $propertyNameCollectionFactoryProphecy->create(NotAResource::class, Argument::cetera())->willReturn(new PropertyNameCollection(['foo', 'bar']));
 
         $propertyMetadataFactoryProphecy = $this->prophesize(PropertyMetadataFactoryInterface::class);
-        $propertyMetadataFactoryProphecy->create(NotAResource::class, 'foo', Argument::cetera())->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_STRING), null, true));
-        $propertyMetadataFactoryProphecy->create(NotAResource::class, 'bar', Argument::cetera())->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_INT), null, true));
+        $propertyMetadataFactoryProphecy->create(NotAResource::class, 'foo', Argument::cetera())->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_STRING), null, true, null, null, null, null, null, null, null, null, null, null, '', ''));
+        $propertyMetadataFactoryProphecy->create(NotAResource::class, 'bar', Argument::cetera())->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_INT), null, true, null, null, null, null, null, null, null, null, null, null, 'default_bar', 'example_bar'));
 
         $resourceClassResolverProphecy = $this->prophesize(ResourceClassResolverInterface::class);
         $resourceClassResolverProphecy->isResourceClass(NotAResource::class)->willReturn(false);
@@ -73,13 +74,20 @@ class SchemaFactoryTest extends TestCase
         $this->assertArrayHasKey($rootDefinitionKey, $definitions);
         $this->assertArrayHasKey('type', $definitions[$rootDefinitionKey]);
         $this->assertSame('object', $definitions[$rootDefinitionKey]['type']);
+        $this->assertArrayNotHasKey('additionalProperties', $definitions[$rootDefinitionKey]);
         $this->assertArrayHasKey('properties', $definitions[$rootDefinitionKey]);
         $this->assertArrayHasKey('foo', $definitions[$rootDefinitionKey]['properties']);
         $this->assertArrayHasKey('type', $definitions[$rootDefinitionKey]['properties']['foo']);
+        $this->assertArrayNotHasKey('default', $definitions[$rootDefinitionKey]['properties']['foo']);
+        $this->assertArrayNotHasKey('example', $definitions[$rootDefinitionKey]['properties']['foo']);
         $this->assertSame('string', $definitions[$rootDefinitionKey]['properties']['foo']['type']);
         $this->assertArrayHasKey('bar', $definitions[$rootDefinitionKey]['properties']);
         $this->assertArrayHasKey('type', $definitions[$rootDefinitionKey]['properties']['bar']);
+        $this->assertArrayHasKey('default', $definitions[$rootDefinitionKey]['properties']['bar']);
+        $this->assertArrayHasKey('example', $definitions[$rootDefinitionKey]['properties']['bar']);
         $this->assertSame('integer', $definitions[$rootDefinitionKey]['properties']['bar']['type']);
+        $this->assertSame('default_bar', $definitions[$rootDefinitionKey]['properties']['bar']['default']);
+        $this->assertSame('example_bar', $definitions[$rootDefinitionKey]['properties']['bar']['example']);
     }
 
     public function testBuildSchemaForOperationWithOverriddenSerializerGroups(): void
@@ -97,7 +105,9 @@ class SchemaFactoryTest extends TestCase
             'put' => [
                 'normalization_context' => [
                     'groups' => 'overridden_operation_dummy_put',
+                    AbstractNormalizer::ALLOW_EXTRA_ATTRIBUTES => false,
                 ],
+                'validation_groups' => ['validation_groups_dummy_put'],
             ],
         ], [], [
             'normalization_context' => [
@@ -106,21 +116,22 @@ class SchemaFactoryTest extends TestCase
         ]));
 
         $serializerGroup = 'overridden_operation_dummy_put';
+        $validationGroups = 'validation_groups_dummy_put';
 
         $propertyNameCollectionFactoryProphecy = $this->prophesize(PropertyNameCollectionFactoryInterface::class);
         $propertyNameCollectionFactoryProphecy->create(OverriddenOperationDummy::class, Argument::allOf(
             Argument::type('array'),
-            Argument::withEntry('serializer_groups', [$serializerGroup])
+            Argument::allOf(Argument::withEntry('serializer_groups', [$serializerGroup]), Argument::withEntry('validation_groups', [$validationGroups]))
         ))->willReturn(new PropertyNameCollection(['alias', 'description']));
 
         $propertyMetadataFactoryProphecy = $this->prophesize(PropertyMetadataFactoryInterface::class);
         $propertyMetadataFactoryProphecy->create(OverriddenOperationDummy::class, 'alias', Argument::allOf(
             Argument::type('array'),
-            Argument::withEntry('serializer_groups', [$serializerGroup])
+            Argument::allOf(Argument::withEntry('serializer_groups', [$serializerGroup]), Argument::withEntry('validation_groups', [$validationGroups]))
         ))->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_STRING), null, true));
         $propertyMetadataFactoryProphecy->create(OverriddenOperationDummy::class, 'description', Argument::allOf(
             Argument::type('array'),
-            Argument::withEntry('serializer_groups', [$serializerGroup])
+            Argument::allOf(Argument::withEntry('serializer_groups', [$serializerGroup]), Argument::withEntry('validation_groups', [$validationGroups]))
         ))->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_STRING), null, true));
 
         $resourceClassResolverProphecy = $this->prophesize(ResourceClassResolverInterface::class);
@@ -136,6 +147,7 @@ class SchemaFactoryTest extends TestCase
         $this->assertArrayHasKey($rootDefinitionKey, $definitions);
         $this->assertArrayHasKey('type', $definitions[$rootDefinitionKey]);
         $this->assertSame('object', $definitions[$rootDefinitionKey]['type']);
+        $this->assertFalse($definitions[$rootDefinitionKey]['additionalProperties']);
         $this->assertArrayHasKey('properties', $definitions[$rootDefinitionKey]);
         $this->assertArrayHasKey('alias', $definitions[$rootDefinitionKey]['properties']);
         $this->assertArrayHasKey('type', $definitions[$rootDefinitionKey]['properties']['alias']);

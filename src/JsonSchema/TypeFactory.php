@@ -126,7 +126,7 @@ final class TypeFactory implements TypeFactoryInterface
             return ['type' => 'string'];
         }
 
-        if ($this->isResourceClass($className) && true !== $readableLink) {
+        if (true !== $readableLink && $this->isResourceClass($className)) {
             return [
                 'type' => 'string',
                 'format' => 'iri-reference',
@@ -167,6 +167,17 @@ final class TypeFactory implements TypeFactoryInterface
                 'nullable' => true,
                 'anyOf' => [$jsonSchema],
             ];
+        }
+
+        if ($schema && Schema::VERSION_JSON_SCHEMA === $schema->getVersion()) {
+            return array_merge(
+                $jsonSchema,
+                [
+                    'type' => \is_array($jsonSchema['type'])
+                        ? array_merge($jsonSchema['type'], ['null'])
+                        : [$jsonSchema['type'], 'null'],
+                ]
+            );
         }
 
         return array_merge($jsonSchema, ['nullable' => true]);

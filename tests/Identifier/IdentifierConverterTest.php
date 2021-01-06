@@ -32,7 +32,12 @@ class IdentifierConverterTest extends TestCase
 
     public function testCompositeIdentifier()
     {
-        $identifier = 'a=1;c=2;d=2015-04-05';
+        $identifiers = [
+            'a' => '1',
+            'c' => '2',
+            'd' => '2015-04-05',
+        ];
+
         $class = 'Dummy';
 
         $integerPropertyMetadata = (new PropertyMetadata())->withIdentifier(true)->withType(new Type(Type::BUILTIN_TYPE_INT));
@@ -51,14 +56,14 @@ class IdentifierConverterTest extends TestCase
 
         $identifierDenormalizer = new IdentifierConverter($identifiersExtractor->reveal(), $propertyMetadataFactory->reveal(), $identifierDenormalizers);
 
-        $result = $identifierDenormalizer->convert($identifier, $class);
+        $result = $identifierDenormalizer->convert($identifiers, $class);
         $this->assertEquals(['a' => 1, 'c' => '2', 'd' => new \DateTime('2015-04-05')], $result);
         $this->assertSame(1, $result['a']);
     }
 
     public function testSingleDateIdentifier()
     {
-        $identifier = '2015-04-05';
+        $identifier = ['funkyid' => '2015-04-05'];
         $class = 'Dummy';
 
         $dateIdentifierPropertyMetadata = (new PropertyMetadata())->withIdentifier(true)->withType(new Type(Type::BUILTIN_TYPE_OBJECT, false, \DateTime::class));
@@ -77,7 +82,7 @@ class IdentifierConverterTest extends TestCase
 
     public function testIntegerIdentifier()
     {
-        $identifier = '42';
+        $identifier = ['id' => '42'];
         $class = 'Dummy';
 
         $integerIdentifierPropertyMetadata = (new PropertyMetadata())->withIdentifier(true)->withType(new Type(Type::BUILTIN_TYPE_INT));

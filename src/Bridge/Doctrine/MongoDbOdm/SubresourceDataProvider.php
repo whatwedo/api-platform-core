@@ -25,11 +25,11 @@ use ApiPlatform\Core\Identifier\IdentifierConverterInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
-use Doctrine\Common\Persistence\ManagerRegistry;
 use Doctrine\ODM\MongoDB\Aggregation\Builder;
 use Doctrine\ODM\MongoDB\DocumentManager;
 use Doctrine\ODM\MongoDB\Mapping\ClassMetadata;
 use Doctrine\ODM\MongoDB\Repository\DocumentRepository;
+use Doctrine\Persistence\ManagerRegistry;
 
 /**
  * Subresource data provider for the Doctrine MongoDB ODM.
@@ -121,8 +121,16 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
 
         $topAggregationBuilder = $topAggregationBuilder ?? $previousAggregationBuilder;
 
-        [$identifier, $identifierResourceClass] = $context['identifiers'][$remainingIdentifiers - 1];
-        $previousAssociationProperty = $context['identifiers'][$remainingIdentifiers][0] ?? $context['property'];
+        if (\is_string(key($context['identifiers']))) {
+            $contextIdentifiers = array_keys($context['identifiers']);
+            $identifier = $contextIdentifiers[$remainingIdentifiers - 1];
+            $identifierResourceClass = $context['identifiers'][$identifier][0];
+            $previousAssociationProperty = $contextIdentifiers[$remainingIdentifiers] ?? $context['property'];
+        } else {
+            @trigger_error('Identifiers should match the convention introduced in ADR 0001-resource-identifiers, this behavior will be removed in 3.0.', E_USER_DEPRECATED);
+            [$identifier, $identifierResourceClass] = $context['identifiers'][$remainingIdentifiers - 1];
+            $previousAssociationProperty = $context['identifiers'][$remainingIdentifiers][0] ?? $context['property'];
+        }
 
         $manager = $this->managerRegistry->getManagerForClass($identifierResourceClass);
         if (!$manager instanceof DocumentManager) {
@@ -164,8 +172,8 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
         $aggregation = $this->buildAggregation($identifiers, $context, $executeOptions, $aggregation, --$remainingIdentifiers, $topAggregationBuilder);
 
         $results = $aggregation->execute($executeOptions)->toArray();
-        $in = array_reduce($results, function ($in, $result) use ($previousAssociationProperty) {
-            return $in + array_map(function ($result) {
+        $in = array_reduce($results, static function ($in, $result) use ($previousAssociationProperty) {
+            return $in + array_map(static function ($result) {
                 return $result['_id'];
             }, $result[$previousAssociationProperty] ?? []);
         }, []);

@@ -166,9 +166,6 @@ final class PublishMercureUpdatesListener
         }
 
         $options = $this->resourceMetadataFactory->create($resourceClass)->getAttribute('mercure', false);
-        if (false === $options) {
-            return;
-        }
 
         if (\is_string($options)) {
             if (null === $this->expressionLanguage) {
@@ -176,6 +173,10 @@ final class PublishMercureUpdatesListener
             }
 
             $options = $this->expressionLanguage->evaluate($options, ['object' => $object]);
+        }
+
+        if (false === $options) {
+            return;
         }
 
         if (true === $options) {
@@ -265,7 +266,10 @@ final class PublishMercureUpdatesListener
         return $updates;
     }
 
-    private function buildUpdate(string $iri, string $data, array $options): Update
+    /**
+     * @param string|string[] $iri
+     */
+    private function buildUpdate($iri, string $data, array $options): Update
     {
         if (method_exists(Update::class, 'isPrivate')) {
             return new Update($iri, $data, $options['private'] ?? false, $options['id'] ?? null, $options['type'] ?? null, $options['retry'] ?? null);

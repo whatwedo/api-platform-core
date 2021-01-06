@@ -49,7 +49,7 @@ class ObjectNormalizerTest extends TestCase
         ]);
 
         $normalizer = new ObjectNormalizer(
-            $serializerProphecy->reveal(),
+            $serializerProphecy->reveal(), // @phpstan-ignore-line
             $iriConverterProphecy->reveal(),
             $contextBuilderProphecy->reveal()
         );
@@ -78,7 +78,7 @@ class ObjectNormalizerTest extends TestCase
         $contextBuilderProphecy->getAnonymousResourceContext($dummy, Argument::type('array'))->shouldNotBeCalled();
 
         $normalizer = new ObjectNormalizer(
-            $serializerProphecy->reveal(),
+            $serializerProphecy->reveal(),  // @phpstan-ignore-line
             $iriConverterProphecy->reveal(),
             $contextBuilderProphecy->reveal()
         );
@@ -102,7 +102,7 @@ class ObjectNormalizerTest extends TestCase
         $contextBuilderProphecy->getAnonymousResourceContext($dummy, ['iri' => '/dummy/1234', 'api_resource' => $dummy])->shouldBeCalled()->willReturn(['@id' => '/dummy/1234', '@type' => 'Dummy', '@context' => []]);
 
         $normalizer = new ObjectNormalizer(
-            $serializerProphecy->reveal(),
+            $serializerProphecy->reveal(), // @phpstan-ignore-line
             $iriConverterProphecy->reveal(),
             $contextBuilderProphecy->reveal()
         );
@@ -132,7 +132,7 @@ class ObjectNormalizerTest extends TestCase
         $contextBuilderProphecy->getAnonymousResourceContext($dummy, ['iri' => '/dummy/1234', 'api_resource' => $dummy, 'has_context' => true])->shouldBeCalled()->willReturn(['@id' => '/dummy/1234', '@type' => 'Dummy']);
 
         $normalizer = new ObjectNormalizer(
-            $serializerProphecy->reveal(),
+            $serializerProphecy->reveal(), // @phpstan-ignore-line
             $iriConverterProphecy->reveal(),
             $contextBuilderProphecy->reveal()
         );

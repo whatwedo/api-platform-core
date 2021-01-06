@@ -91,14 +91,12 @@ use ApiPlatform\Core\Tests\ProphecyTrait;
 use ApiPlatform\Core\Validator\ValidatorInterface;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Doctrine\ORM\OptimisticLockException;
-use FOS\UserBundle\FOSUserBundle;
 use Nelmio\ApiDocBundle\NelmioApiDocBundle;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Prophecy\Exception\Doubler\MethodNotFoundException;
 use Symfony\Bundle\SecurityBundle\SecurityBundle;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
-use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Resource\DirectoryResource;
 use Symfony\Component\Config\Resource\ResourceInterface;
 use Symfony\Component\DependencyInjection\Alias;
@@ -109,7 +107,6 @@ use Symfony\Component\DependencyInjection\Exception\RuntimeException;
 use Symfony\Component\DependencyInjection\Extension\ConfigurationExtensionInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
-use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\DependencyInjection\ParameterBag\EnvPlaceholderParameterBag;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpFoundation\Response;
@@ -158,7 +155,6 @@ class ApiPlatformExtensionTest extends TestCase
         ],
         'defaults' => [
             'attributes' => [],
-            'stateless' => true,
         ],
     ]];
 
@@ -257,25 +253,6 @@ class ApiPlatformExtensionTest extends TestCase
         $this->extension->load($config, $containerBuilder);
     }
 
-    public function testEnableFosUser()
-    {
-        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
-        $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
-        $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
-        $containerBuilderProphecy->getParameter('kernel.bundles')->willReturn([
-            'DoctrineBundle' => DoctrineBundle::class,
-            'FOSUserBundle' => FOSUserBundle::class,
-        ])->shouldBeCalled();
-        $containerBuilderProphecy->setDefinition('api_platform.fos_user.event_listener', Argument::type(Definition::class))->shouldBeCalled();
-
-        $containerBuilder = $containerBuilderProphecy->reveal();
-
-        $config = self::DEFAULT_CONFIG;
-        $config['api_platform']['enable_fos_user'] = true;
-
-        $this->extension->load($config, $containerBuilder);
-    }
-
     public function testDisableProfiler()
     {
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
@@ -305,34 +282,19 @@ class ApiPlatformExtensionTest extends TestCase
         $this->extension->load($config, $containerBuilder);
     }
 
-    public function testFosUserPriority()
-    {
-        $builder = new ContainerBuilder();
-
-        $loader = new XmlFileLoader($builder, new FileLocator(\dirname(__DIR__).'/../../../../src/Bridge/Symfony/Bundle/Resources/config'));
-        $loader->load('api.xml');
-        $loader->load('fos_user.xml');
-
-        $fosListener = $builder->getDefinition('api_platform.fos_user.event_listener');
-        $viewListener = $builder->getDefinition('api_platform.listener.view.serialize');
-
-        // Ensure FOSUser event listener priority is always greater than the view serialize listener
-        $this->assertGreaterThan(
-            $viewListener->getTag('kernel.event_listener')[0]['priority'],
-            $fosListener->getTag('kernel.event_listener')[0]['priority'],
-            'api_platform.fos_user.event_listener priority needs to be greater than that of api_platform.listener.view.serialize'
-        );
-    }
-
     /**
      * @group legacy
      */
     public function testEnableNelmioApiDoc()
     {
+        if (!class_exists(NelmioApiDocBundle::class)) {
+            $this->markTestSkipped('NelmioApiDocBundle is not installed.');
+        }
+
         $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
         $containerBuilderProphecy->getParameter('kernel.bundles')->willReturn([
             'DoctrineBundle' => DoctrineBundle::class,
-            'NelmioApiDocBundle' => NelmioApiDocBundle::class,
+            'NelmioApiDocBundle' => NelmioApiDocBundle::class, // @phpstan-ignore-line
         ])->shouldBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.nelmio_api_doc.annotations_provider', Argument::type(Definition::class))->shouldBeCalled();
         $containerBuilderProphecy->setDefinition('api_platform.nelmio_api_doc.parser', Argument::type(Definition::class))->shouldBeCalled();
@@ -721,7 +683,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->registerForAutoconfiguration(RequestBodySearchCollectionExtensionInterface::class)->willReturn($this->childDefinitionProphecy)->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.elasticsearch.hosts', ['http://elasticsearch:9200'])->shouldBeCalled();
         $containerBuilderProphecy->setParameter('api_platform.elasticsearch.mapping', [])->shouldBeCalled();
-        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => ['stateless' => true]])->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => []])->shouldBeCalled();
 
         $config = self::DEFAULT_CONFIG;
         $config['api_platform']['elasticsearch'] = [
@@ -872,7 +834,8 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.http_cache.vary' => ['Accept'],
             'api_platform.http_cache.public' => null,
             'api_platform.http_cache.invalidation.max_header_length' => 7500,
-            'api_platform.defaults' => ['attributes' => ['stateless' => true]],
+            'api_platform.asset_package' => null,
+            'api_platform.defaults' => ['attributes' => []],
             'api_platform.enable_entrypoint' => true,
             'api_platform.enable_docs' => true,
             'api_platform.url_generation_strategy' => 1,
@@ -1176,7 +1139,14 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.resource_class_directories' => Argument::type('array'),
             'api_platform.validator.serialize_payload_fields' => [],
             'api_platform.elasticsearch.enabled' => false,
-            'api_platform.defaults' => ['attributes' => ['stateless' => true]],
+            'api_platform.asset_package' => null,
+            'api_platform.defaults' => ['attributes' => []],
+            'api_platform.openapi.termsOfService' => null,
+            'api_platform.openapi.contact.name' => null,
+            'api_platform.openapi.contact.url' => null,
+            'api_platform.openapi.contact.email' => null,
+            'api_platform.openapi.license.name' => null,
+            'api_platform.openapi.license.url' => null,
         ];
 
         if ($hasSwagger) {
@@ -1394,7 +1364,6 @@ class ApiPlatformExtensionTest extends TestCase
             BooleanFilter::class => 'api_platform.doctrine.orm.boolean_filter',
             NumericFilter::class => 'api_platform.doctrine.orm.numeric_filter',
             ExistsFilter::class => 'api_platform.doctrine.orm.exists_filter',
-            'api_platform.doctrine.listener.mercure.publish' => 'api_platform.doctrine.orm.listener.mercure.publish',
             GraphQlSerializerContextBuilderInterface::class => 'api_platform.graphql.serializer.context_builder',
         ];
 

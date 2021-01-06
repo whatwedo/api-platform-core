@@ -23,6 +23,12 @@
             <argument>%api_platform.oauth.refreshUrl%</argument>
             <argument>%api_platform.oauth.scopes%</argument>
             <argument>%api_platform.swagger.api_keys%</argument>
+            <argument>%api_platform.openapi.contact.name%</argument>
+            <argument>%api_platform.openapi.contact.url%</argument>
+            <argument>%api_platform.openapi.contact.email%</argument>
+            <argument>%api_platform.openapi.termsOfService%</argument>
+            <argument>%api_platform.openapi.license.name%</argument>
+            <argument>%api_platform.openapi.license.url%</argument>
         </service>
         <service id="ApiPlatform\Core\OpenApi\Options" alias="api_platform.openapi.options" />
 
@@ -36,6 +42,7 @@
             <argument type="service" id="api_platform.operation_path_resolver" />
             <argument type="service" id="api_platform.filter_locator" />
             <argument type="service" id="api_platform.subresource_operation_factory" />
+            <argument type="service" id="api_platform.identifiers_extractor.cached" />
             <argument>%api_platform.formats%</argument>
             <argument type="service" id="api_platform.openapi.options" />
             <argument type="service" id="api_platform.pagination_options" />

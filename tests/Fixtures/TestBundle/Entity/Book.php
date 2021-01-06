@@ -13,31 +13,41 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity;
 
-use ApiPlatform\Core\Annotation\ApiProperty;
 use ApiPlatform\Core\Annotation\ApiResource;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * @ApiResource(messenger="persist")
+ * Book.
+ *
+ * @author Antoine Bluchet <soyuka@gmail.com>
+ *
+ * @ApiResource(collectionOperations={}, itemOperations={
+ *     "get",
+ *     "get_by_isbn"={"method"="GET", "path"="/books/by_isbn/{isbn}.{_format}", "requirements"={"isbn"=".+"}, "identifiers"="isbn"}
+ * })
  * @ORM\Entity
  */
-class MessengerWithPersist
+class Book
 {
     /**
-     * @var int|null
-     *
-     * @ApiProperty(identifier=true)
-     *
      * @ORM\Column(type="integer")
      * @ORM\Id
      * @ORM\GeneratedValue(strategy="AUTO")
      */
-    public $id;
+    private $id;
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(type="string")
+     * @ORM\Column
      */
     public $name;
+
+    /**
+     * @ORM\Column(unique=true)
+     */
+    public $isbn;
+
+    public function getId()
+    {
+        return $this->id;
+    }
 }

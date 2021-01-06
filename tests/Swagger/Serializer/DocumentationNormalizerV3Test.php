@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace ApiPlatform\Core\Tests\Swagger\Serializer;
 
 use ApiPlatform\Core\Api\FilterCollection;
+use ApiPlatform\Core\Api\IdentifiersExtractorInterface;
 use ApiPlatform\Core\Api\OperationAwareFormatsProviderInterface;
 use ApiPlatform\Core\Api\OperationMethodResolverInterface;
 use ApiPlatform\Core\Api\OperationType;
@@ -107,7 +108,7 @@ class DocumentationNormalizerV3Test extends TestCase
                 'custom' => ['method' => 'GET', 'path' => '/foo'] + self::OPERATION_FORMATS,
                 'custom2' => ['method' => 'POST', 'path' => '/foo'] + self::OPERATION_FORMATS,
             ],
-            ['pagination_client_items_per_page' => true]
+            ['pagination_client_items_per_page' => true, 'normalization_context' => [AbstractNormalizer::ALLOW_EXTRA_ATTRIBUTES => false]]
         );
         $resourceMetadataFactoryProphecy = $this->prophesize(ResourceMetadataFactoryInterface::class);
         $resourceMetadataFactoryProphecy->create(Dummy::class)->willReturn($dummyMetadata);
@@ -119,6 +120,9 @@ class DocumentationNormalizerV3Test extends TestCase
         $propertyMetadataFactoryProphecy->create(Dummy::class, 'dummyDate', Argument::cetera())->shouldBeCalled()->willReturn(new PropertyMetadata(new Type(Type::BUILTIN_TYPE_OBJECT, true, \DateTime::class), 'This is a \DateTimeInterface object.', true, true, true, true, false, false, null, null, []));
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
+
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
 
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
@@ -145,7 +149,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -370,6 +376,7 @@ class DocumentationNormalizerV3Test extends TestCase
                 'schemas' => new \ArrayObject([
                     'Dummy' => new \ArrayObject([
                         'type' => 'object',
+                        'additionalProperties' => false,
                         'description' => 'This is a dummy.',
                         'externalDocs' => ['url' => 'http://schema.example.com/Dummy'],
                         'properties' => [
@@ -476,6 +483,9 @@ class DocumentationNormalizerV3Test extends TestCase
             $typeFactory->setSchemaFactory($schemaFactory);
         }
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactory,
             $propertyNameCollectionFactory,
@@ -501,7 +511,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -609,6 +621,9 @@ class DocumentationNormalizerV3Test extends TestCase
             ],
         ];
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -634,7 +649,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -749,6 +766,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -774,7 +794,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -963,6 +985,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -988,7 +1013,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -1084,6 +1111,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -1109,7 +1139,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -1307,6 +1339,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -1332,7 +1367,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -1605,7 +1642,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $this->prophesize(IdentifiersExtractorInterface::class)->reveal()
         );
     }
 
@@ -1615,6 +1654,7 @@ class DocumentationNormalizerV3Test extends TestCase
         $propertyNameCollectionFactoryProphecy = $this->prophesize(PropertyNameCollectionFactoryInterface::class);
         $propertyMetadataFactoryProphecy = $this->prophesize(PropertyMetadataFactoryInterface::class);
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
 
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
@@ -1641,7 +1681,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $documentation = new Documentation(new ResourceNameCollection([Dummy::class]), 'Test API', 'This is a test API.', '1.2.3');
@@ -1675,6 +1717,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -1700,7 +1745,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -1735,6 +1782,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -1760,7 +1810,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -1837,6 +1889,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -1862,7 +1917,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2061,6 +2118,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2086,7 +2146,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2242,7 +2304,13 @@ class DocumentationNormalizerV3Test extends TestCase
         $propertyNameCollectionFactory = $propertyNameCollectionFactoryProphecy->reveal();
         $propertyMetadataFactory = $propertyMetadataFactoryProphecy->reveal();
 
-        $subresourceOperationFactory = new SubresourceOperationFactory($resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new UnderscorePathSegmentNameGenerator());
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
+        $subresourceOperationFactory = new SubresourceOperationFactory($resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new UnderscorePathSegmentNameGenerator(), $identifiersExtractorProphecy->reveal());
+
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
 
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactory,
@@ -2269,7 +2337,9 @@ class DocumentationNormalizerV3Test extends TestCase
             $formatProvider ?? [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2391,6 +2461,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2416,7 +2489,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2505,6 +2580,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2530,7 +2608,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2633,6 +2713,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2658,7 +2741,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2770,6 +2855,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new CustomOperationPathResolver(new OperationPathResolver(new UnderscorePathSegmentNameGenerator()));
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2795,7 +2883,9 @@ class DocumentationNormalizerV3Test extends TestCase
             [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [
@@ -2923,6 +3013,9 @@ class DocumentationNormalizerV3Test extends TestCase
 
         $operationPathResolver = new OperationPathResolver(new UnderscorePathSegmentNameGenerator());
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $normalizer = new DocumentationNormalizer(
             $resourceMetadataFactoryProphecy->reveal(),
             $propertyNameCollectionFactoryProphecy->reveal(),
@@ -2947,7 +3040,9 @@ class DocumentationNormalizerV3Test extends TestCase
             $formatsProvider ?? [],
             false,
             'pagination',
-            ['spec_version' => 3]
+            ['spec_version' => 3],
+            [2, 3],
+            $identifiersExtractorProphecy->reveal()
         );
 
         $expected = [

@@ -15,6 +15,7 @@ namespace ApiPlatform\Core\Tests\Security;
 
 use ApiPlatform\Core\Security\ExpressionLanguage;
 use ApiPlatform\Core\Security\ResourceAccessChecker;
+use ApiPlatform\Core\Tests\Fixtures\Serializable;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
@@ -42,8 +43,10 @@ class ResourceAccessCheckerTest extends TestCase
         $tokenStorageProphecy = $this->prophesize(TokenStorageInterface::class);
 
         $tokenProphecy = $this->prophesize(TokenInterface::class);
+        $tokenProphecy->willImplement(Serializable::class);
         $token = $tokenProphecy->reveal();
         $tokenProphecy->getUser()->shouldBeCalled();
+
         if (method_exists($token, 'getRoleNames')) {
             $tokenProphecy->getRoleNames()->willReturn([])->shouldBeCalled();
         } else {
@@ -73,23 +76,11 @@ class ResourceAccessCheckerTest extends TestCase
     public function testExpressionLanguageNotInstalled()
     {
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('The "symfony/expression-language" library must be installed to use the "security".');
+        $this->expectExceptionMessage('The "symfony/expression-language" library must be installed to use the "security" attribute.');
 
         $authenticationTrustResolverProphecy = $this->prophesize(AuthenticationTrustResolverInterface::class);
         $tokenStorageProphecy = $this->prophesize(TokenStorageInterface::class);
-        $tokenStorageProphecy->getToken()->willReturn($this->prophesize(TokenInterface::class)->reveal());
-
-        $checker = new ResourceAccessChecker(null, $authenticationTrustResolverProphecy->reveal(), null, $tokenStorageProphecy->reveal());
-        $checker->isGranted(Dummy::class, 'is_granted("ROLE_ADMIN")');
-    }
-
-    public function testNotBehindAFirewall()
-    {
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('The current token must be set to use the "security" attribute (is the URL behind a firewall?).');
-
-        $authenticationTrustResolverProphecy = $this->prophesize(AuthenticationTrustResolverInterface::class);
-        $tokenStorageProphecy = $this->prophesize(TokenStorageInterface::class);
+        $tokenStorageProphecy->getToken()->willReturn($this->prophesize(TokenInterface::class)->willImplement(Serializable::class)->reveal());
 
         $checker = new ResourceAccessChecker(null, $authenticationTrustResolverProphecy->reveal(), null, $tokenStorageProphecy->reveal());
         $checker->isGranted(Dummy::class, 'is_granted("ROLE_ADMIN")');

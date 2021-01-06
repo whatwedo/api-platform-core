@@ -142,6 +142,8 @@ class RequestDataCollectorTest extends TestCase
 
         $this->assertSame([
             'resource_class' => DummyEntity::class,
+            'has_composite_identifier' => false,
+            'identifiers' => ['id' => [DummyEntity::class, 'id']],
             'item_operation_name' => 'get',
             'receive' => true,
             'respond' => true,
@@ -181,7 +183,8 @@ class RequestDataCollectorTest extends TestCase
 
         $dataProvider = $dataCollector->getCollectionDataProviders();
         foreach ($dataProvider['responses'] as $class => $response) {
-            $this->assertStringStartsWith('class@anonymous', $class);
+            $this->assertStringContainsString('@anonymous', $class);
+
             $this->assertTrue($response);
         }
         $context = $dataProvider['context'];
@@ -190,7 +193,7 @@ class RequestDataCollectorTest extends TestCase
 
         $dataProvider = $dataCollector->getItemDataProviders();
         foreach ($dataProvider['responses'] as $class => $response) {
-            $this->assertStringStartsWith('class@anonymous', $class);
+            $this->assertStringContainsString('@anonymous', $class);
             $this->assertTrue($response);
         }
         $context = $dataProvider['context'];
@@ -199,7 +202,7 @@ class RequestDataCollectorTest extends TestCase
 
         $dataProvider = $dataCollector->getSubresourceDataProviders();
         foreach ($dataProvider['responses'] as $class => $response) {
-            $this->assertStringStartsWith('class@anonymous', $class);
+            $this->assertStringContainsString('@anonymous', $class);
             $this->assertTrue($response);
         }
         $context = $dataProvider['context'];
@@ -208,7 +211,7 @@ class RequestDataCollectorTest extends TestCase
 
         $dataPersister = $dataCollector->getDataPersisters();
         foreach ($dataPersister['responses'] as $class => $response) {
-            $this->assertStringStartsWith('class@anonymous', $class);
+            $this->assertStringContainsString('@anonymous', $class);
             $this->assertTrue($response);
         }
     }
@@ -281,7 +284,7 @@ class RequestDataCollectorTest extends TestCase
                 }
             },
         ]));
-        $itemDataProvider->getItem('', '', null, ['item_context']);
+        $itemDataProvider->getItem('', [], null, ['item_context']);
 
         return $itemDataProvider;
     }

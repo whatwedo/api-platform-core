@@ -13,32 +13,34 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity;
 
+use ApiPlatform\Core\Annotation\ApiFilter;
 use ApiPlatform\Core\Annotation\ApiProperty;
 use ApiPlatform\Core\Annotation\ApiResource;
-use ApiPlatform\Core\Tests\Fixtures\TestBundle\Dto\MessengerInput;
+use ApiPlatform\Core\Bridge\Doctrine\Orm\Filter\SearchFilter;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * @ApiResource(messenger={"persist", "input"}, input=MessengerInput::class)
  * @ORM\Entity
  */
-class MessengerWithArray
+#[ApiResource(description: "Hey PHP 8")]
+class DummyPhp8
 {
     /**
-     * @var int|null
-     *
-     * @ApiProperty(identifier=true)
-     *
-     * @ORM\Column(type="integer")
      * @ORM\Id
-     * @ORM\GeneratedValue(strategy="AUTO")
+     * @ORM\Column(type="integer")
      */
+    #[ApiProperty(identifier: true, description: 'the identifier')]
     public $id;
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(type="string")
+     * @ORM\Column
      */
-    public $name;
+    #[ApiFilter(SearchFilter::class)]
+    public $filtered;
+
+    #[ApiProperty(description: 'a foo')]
+    public function getFoo(): int
+    {
+        return 0;
+    }
 }

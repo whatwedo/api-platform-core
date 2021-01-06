@@ -11,10 +11,13 @@
 
 declare(strict_types=1);
 
+namespace ApiPlatform\Core\Tests\Behat;
+
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\AbsoluteUrlDummy as AbsoluteUrlDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\AbsoluteUrlRelationDummy as AbsoluteUrlRelationDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Address as AddressDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Answer as AnswerDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Book as BookDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeItem as CompositeItemDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositeLabel as CompositeLabelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CompositePrimitiveItem as CompositePrimitiveItemDocument;
@@ -26,6 +29,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedOwner as Conver
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedRelated as ConvertedRelatedDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ConvertedString as ConvertedStringDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Customer as CustomerDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\CustomMultipleIdentifierDummy as CustomMultipleIdentifierDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Dummy as DummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyAggregateOffer as DummyAggregateOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyCar as DummyCarDocument;
@@ -59,6 +63,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\MaxDepthDummy as MaxDept
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\NetworkPathDummy as NetworkPathDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\NetworkPathRelationDummy as NetworkPathRelationDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Order as OrderDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\PatchDummyRelation as PatchDummyRelationDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Person as PersonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\PersonToPet as PersonToPetDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Pet as PetDocument;
@@ -79,6 +84,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlRelationDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Address;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Answer;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Book;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeItem;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositeLabel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CompositePrimitiveItem;
@@ -90,6 +96,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedOwner;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedRelated;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ConvertedString;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Customer;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\CustomMultipleIdentifierDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyAggregateOffer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\DummyCar;
@@ -126,6 +133,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\MaxDepthDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\NetworkPathDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\NetworkPathRelationDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Order;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PatchDummyRelation;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Person;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PersonToPet;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Pet;
@@ -147,10 +155,11 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\User;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UuidIdentifierDummy;
 use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
-use Doctrine\Common\Persistence\ManagerRegistry;
 use Doctrine\ODM\MongoDB\DocumentManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 
 /**
@@ -159,7 +168,7 @@ use Symfony\Component\Security\Core\Encoder\UserPasswordEncoderInterface;
 final class DoctrineContext implements Context
 {
     /**
-     * @var EntityManagerInterface|DocumentManager
+     * @var ObjectManager
      */
     private $manager;
     private $doctrine;
@@ -190,10 +199,16 @@ final class DoctrineContext implements Context
      */
     public function createDatabase()
     {
-        $this->isOrm() && $this->schemaTool->dropSchema($this->classes);
-        $this->isOdm() && $this->schemaManager->dropDatabases();
+        if ($this->isOrm()) {
+            $this->schemaTool->dropSchema($this->classes);
+            $this->schemaTool->createSchema($this->classes);
+        }
+
+        if ($this->isOdm()) {
+            $this->schemaManager->dropDatabases();
+        }
+
         $this->doctrine->getManager()->clear();
-        $this->isOrm() && $this->schemaTool->createSchema($this->classes);
     }
 
     /**
@@ -502,7 +517,7 @@ final class DoctrineContext implements Context
         for ($i = 1; $i <= $nb; ++$i) {
             $dummyDto = $this->buildDummyDtoNoOutput();
             $dummyDto->lorem = 'DummyDtoNoOutput foo #'.$i;
-            $dummyDto->ipsum = $i / 3;
+            $dummyDto->ipsum = (string) ($i / 3);
 
             $this->manager->persist($dummyDto);
         }
@@ -661,9 +676,9 @@ final class DoctrineContext implements Context
     {
         $descriptions = ['Smart dummy.', 'Not so smart dummy.'];
 
-        if (in_array($bool, ['true', '1', 1], true)) {
+        if (\in_array($bool, ['true', '1', 1], true)) {
             $bool = true;
-        } elseif (in_array($bool, ['false', '0', 0], true)) {
+        } elseif (\in_array($bool, ['false', '0', 0], true)) {
             $bool = false;
         } else {
             $expected = ['true', 'false', '1', '0'];
@@ -831,9 +846,9 @@ final class DoctrineContext implements Context
      */
     public function thereAreDummyObjectsWithDummyBoolean(int $nb, string $bool)
     {
-        if (in_array($bool, ['true', '1', 1], true)) {
+        if (\in_array($bool, ['true', '1', 1], true)) {
             $bool = true;
-        } elseif (in_array($bool, ['false', '0', 0], true)) {
+        } elseif (\in_array($bool, ['false', '0', 0], true)) {
             $bool = false;
         } else {
             $expected = ['true', 'false', '1', '0'];
@@ -859,9 +874,9 @@ final class DoctrineContext implements Context
      */
     public function thereAreDummyObjectsWithEmbeddedDummyBoolean(int $nb, string $bool)
     {
-        if (in_array($bool, ['true', '1', 1], true)) {
+        if (\in_array($bool, ['true', '1', 1], true)) {
             $bool = true;
-        } elseif (in_array($bool, ['false', '0', 0], true)) {
+        } elseif (\in_array($bool, ['false', '0', 0], true)) {
             $bool = false;
         } else {
             $expected = ['true', 'false', '1', '0'];
@@ -886,9 +901,9 @@ final class DoctrineContext implements Context
      */
     public function thereAreDummyObjectsWithRelationEmbeddedDummyBoolean(int $nb, string $bool)
     {
-        if (in_array($bool, ['true', '1', 1], true)) {
+        if (\in_array($bool, ['true', '1', 1], true)) {
             $bool = true;
-        } elseif (in_array($bool, ['false', '0', 0], true)) {
+        } elseif (\in_array($bool, ['false', '0', 0], true)) {
             $bool = false;
         } else {
             $expected = ['true', 'false', '1', '0'];
@@ -1409,7 +1424,7 @@ final class DoctrineContext implements Context
         for ($i = 0; $i < $nb; ++$i) {
             $dto = $this->isOrm() ? new DummyDtoCustom() : new DummyDtoCustomDocument();
             $dto->lorem = 'test';
-            $dto->ipsum = (string) $i + 1;
+            $dto->ipsum = (string) ($i + 1);
             $this->manager->persist($dto);
         }
 
@@ -1646,6 +1661,45 @@ final class DoctrineContext implements Context
         $initializeInput->name = '1984';
 
         $this->manager->persist($initializeInput);
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is a PatchDummyRelation
+     */
+    public function thereIsAPatchDummyRelation()
+    {
+        $dummy = $this->buildPatchDummyRelation();
+        $related = $this->buildRelatedDummy();
+        $dummy->setRelated($related);
+        $this->manager->persist($related);
+        $this->manager->persist($dummy);
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is a book
+     */
+    public function thereIsABook()
+    {
+        $book = $this->buildBook();
+        $book->name = '1984';
+        $book->isbn = '9780451524935';
+        $this->manager->persist($book);
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is a custom multiple identifier dummy
+     */
+    public function thereIsACustomMultipleIdentifierDummy()
+    {
+        $dummy = $this->buildCustomMultipleIdentifierDummy();
+        $dummy->setName('Orwell');
+        $dummy->setFirstId(1);
+        $dummy->setSecondId(2);
+
+        $this->manager->persist($dummy);
         $this->manager->flush();
     }
 
@@ -2081,5 +2135,29 @@ final class DoctrineContext implements Context
     private function buildInitializeInput()
     {
         return $this->isOrm() ? new InitializeInput() : new InitializeInputDocument();
+    }
+
+    /**
+     * @return PatchDummyRelation|PatchDummyRelationDocument
+     */
+    private function buildPatchDummyRelation()
+    {
+        return $this->isOrm() ? new PatchDummyRelation() : new PatchDummyRelationDocument();
+    }
+
+    /**
+     * @return BookDocument | Book
+     */
+    private function buildBook()
+    {
+        return $this->isOrm() ? new Book() : new BookDocument();
+    }
+
+    /**
+     * @return CustomMultipleIdentifierDummy | CustomMultipleIdentifierDummyDocument
+     */
+    private function buildCustomMultipleIdentifierDummy()
+    {
+        return $this->isOrm() ? new CustomMultipleIdentifierDummy() : new CustomMultipleIdentifierDummyDocument();
     }
 }

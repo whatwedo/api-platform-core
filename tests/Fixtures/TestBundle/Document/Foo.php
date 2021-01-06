@@ -30,6 +30,11 @@ use Doctrine\ODM\MongoDB\Mapping\Annotations as ODM;
  *         "collection_query"={"pagination_enabled"=false},
  *         "create",
  *         "delete"
+ *     },
+ *     collectionOperations={
+ *         "get",
+ *         "get_desc_custom"={"method"="GET", "path"="custom_collection_desc_foos", "order"={"name"="DESC"}},
+ *         "get_asc_custom"={"method"="GET", "path"="custom_collection_asc_foos", "order"={ "name"="ASC"}},
  *     }
  * )
  * @ODM\Document
@@ -39,7 +44,7 @@ class Foo
     /**
      * @var int The id
      *
-     * @ODM\Id(strategy="INCREMENT", type="integer")
+     * @ODM\Id(strategy="INCREMENT", type="int")
      */
     private $id;
 

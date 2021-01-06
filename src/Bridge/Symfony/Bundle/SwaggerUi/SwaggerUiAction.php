@@ -70,6 +70,7 @@ final class SwaggerUiAction
             'graphqlEnabled' => $this->swaggerUiContext->isGraphQlEnabled(),
             'graphiQlEnabled' => $this->swaggerUiContext->isGraphiQlEnabled(),
             'graphQlPlaygroundEnabled' => $this->swaggerUiContext->isGraphQlPlaygroundEnabled(),
+            'assetPackage' => $this->swaggerUiContext->getAssetPackage(),
         ];
 
         $swaggerData = [
@@ -112,7 +113,7 @@ final class SwaggerUiAction
     {
         foreach ($swaggerData['spec']['paths'] as $path => $operations) {
             foreach ($operations as $method => $operation) {
-                if ($operation['operationId'] ?? null === $swaggerData['operationId']) {
+                if (($operation['operationId'] ?? null) === $swaggerData['operationId']) {
                     return [$path, $method];
                 }
             }

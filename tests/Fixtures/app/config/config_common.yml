@@ -7,7 +7,6 @@ framework:
     test:                              ~
     session:
         storage_id:                    'session.storage.mock_file'
-    form:                              ~ # For FOSUser
     profiler:
         enabled:                        true
         collect:                        false
@@ -16,6 +15,8 @@ framework:
         buses:
             messenger.bus.default:
                 default_middleware: allow_no_handlers
+    router:
+        utf8:                           true
 
 web_profiler:
     toolbar: true
@@ -62,7 +63,9 @@ api_platform:
         enabled: true
         nesting_separator: __
     name_converter:                    'app.name_converter'
-    enable_fos_user:                   true
+    collection:
+        order_parameter_name:          'order'
+        order:                         'ASC'
     exception_to_status:
         Symfony\Component\Serializer\Exception\ExceptionInterface: !php/const Symfony\Component\HttpFoundation\Response::HTTP_BAD_REQUEST
         ApiPlatform\Core\Exception\InvalidArgumentException: !php/const Symfony\Component\HttpFoundation\Response::HTTP_BAD_REQUEST
@@ -81,7 +84,6 @@ api_platform:
             shared_max_age:                   3600
             vary:                             ['Accept', 'Cookie']
             public:                           true
-        stateless: true
 
 parameters:
     container.autowiring.strict_mode: true
@@ -128,9 +130,6 @@ services:
         tags:
             -  { name: 'serializer.normalizer' }
 
-    fos_user.mailer.default:
-        class: 'ApiPlatform\Core\Tests\Mock\FosUser\MailerMock'
-
     app.name_converter:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\Serializer\NameConverter\CustomConverter'
 
@@ -164,6 +163,8 @@ services:
 
     ApiPlatform\Core\Tests\Fixtures\TestBundle\Controller\:
         resource: '../../TestBundle/Controller'
+        autowire: true
+        autoconfigure: true
         tags: ['controller.service_arguments']
 
     ApiPlatform\Core\Tests\Fixtures\TestBundle\Filter\EnumFilter:
@@ -257,12 +258,6 @@ services:
 
     app.data_transformer.custom_output_dto:
         class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\CustomOutputDtoDataTransformer'
-        public: false
-        tags:
-            -  { name: 'api_platform.data_transformer' }
-
-    app.data_transformer.messenger_with_array_dto:
-        class: 'ApiPlatform\Core\Tests\Fixtures\TestBundle\DataTransformer\MessengerWithArrayDtoDataTransformer'
         public: false
         tags:
             -  { name: 'api_platform.data_transformer' }

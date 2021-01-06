@@ -62,7 +62,6 @@ When you send a PR, just make sure that:
 * You make the PR on the same branch you based your changes on. If you see commits
 that you did not make in your PR, you're doing it wrong.
 * Also don't forget to add a comment when you update a PR with a ping to [the maintainers](https://github.com/orgs/api-platform/people), so he/she will get a notification.
-* Squash your commits into one commit (see the next chapter).
 
 ### Tests
 
@@ -90,35 +89,15 @@ Coverage will be available in `coverage/index.html`.
 
 The command to launch Behat tests is:
 
-    php -d memory_limit=-1 ./vendor/bin/behat --suite=default --stop-on-failure --format=progress
+    php -d memory_limit=-1 ./vendor/bin/behat --profile=default --stop-on-failure --format=progress
 
 If you want to launch Behat tests for MongoDB, the command is:
 
-    APP_ENV=mongodb php -d memory_limit=-1 ./vendor/bin/behat --suite=mongodb --stop-on-failure --format=progress
+    MONGODB_URL=mongodb://localhost:27017 APP_ENV=mongodb php -d memory_limit=-1 ./vendor/bin/behat --profile=mongodb --stop-on-failure --format=progress
 
-To get more details about an error, replace `--format=progress` by `-vvv`.
+To get more details about an error, replace `--format=progress` by `-vvv`. You may run a mongo instance using docker:
 
-## Squash your Commits
-
-If you have 3 commits, start with:
-
-    git rebase -i HEAD~3
-
-An editor will be opened with your 3 commits, all prefixed by `pick`.
-
-Replace all `pick` prefixes by `fixup` (or `f`) **except the first commit** of the list.
-
-Save and quit the editor.
-
-After that, all your commits will be squashed into the first one and the commit message will be the first one.
-
-If you would like to rename your commit message, type:
-
-    git commit --amend
-
-Now force push to update your PR:
-
-    git push --force-with-lease
+	docker run -p 27017:27017 mongo:latest
 
 # License and Copyright Attribution
 

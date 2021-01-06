@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Tests\OpenApi\Factory;
 
+use ApiPlatform\Core\Api\IdentifiersExtractorInterface;
 use ApiPlatform\Core\Bridge\Symfony\Routing\RouterOperationPathResolver;
 use ApiPlatform\Core\DataProvider\PaginationOptions;
 use ApiPlatform\Core\JsonSchema\Schema;
@@ -148,6 +149,9 @@ class OpenApiFactoryTest extends TestCase
         $schemaFactory = new SchemaFactory($typeFactory, $resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new CamelCaseToSnakeCaseNameConverter());
         $typeFactory->setSchemaFactory($schemaFactory);
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $factory = new OpenApiFactory(
             $resourceNameCollectionFactoryProphecy->reveal(),
             $resourceMetadataFactory,
@@ -158,6 +162,7 @@ class OpenApiFactoryTest extends TestCase
             $operationPathResolver,
             $filterLocatorProphecy->reveal(),
             $subresourceOperationFactoryProphecy->reveal(),
+            $identifiersExtractorProphecy->reveal(),
             [],
             new Options('Test API', 'This is a test API.', '1.2.3', true, 'oauth2', 'authorizationCode', '/oauth/v2/token', '/oauth/v2/auth', '/oauth/v2/refresh', ['scope param'], [
                 'header' => [
@@ -223,9 +228,15 @@ class OpenApiFactoryTest extends TestCase
 
         $this->assertEquals($components->getSecuritySchemes(), new \ArrayObject([
             'oauth' => new Model\SecurityScheme('oauth2', 'OAuth 2.0 authorization code Grant', null, null, 'oauth2', null, new Model\OAuthFlows(null, null, null, new Model\OAuthFlow('/oauth/v2/auth', '/oauth/v2/token', '/oauth/v2/refresh', new \ArrayObject(['scope param'])))),
-            'header' => new Model\SecurityScheme('apiKey', 'Value for the Authorization header parameter.', 'Authorization', 'header', 'bearer'),
-            'query' => new Model\SecurityScheme('apiKey', 'Value for the key query parameter.', 'key', 'query', 'bearer'),
+            'header' => new Model\SecurityScheme('apiKey', 'Value for the Authorization header parameter.', 'Authorization', 'header'),
+            'query' => new Model\SecurityScheme('apiKey', 'Value for the key query parameter.', 'key', 'query'),
         ]));
+
+        $this->assertSame([
+            ['oauth' => []],
+            ['header' => []],
+            ['query' => []],
+        ], $openApi->getSecurity());
 
         $paths = $openApi->getPaths();
         $dummiesPath = $paths->getPath('/dummies');
@@ -245,7 +256,7 @@ class OpenApiFactoryTest extends TestCase
                     ]))),
                 ])),
             ],
-            '',
+            'Retrieves the collection of Dummy resources.',
             'Retrieves the collection of Dummy resources.',
             null,
             [
@@ -278,7 +289,7 @@ class OpenApiFactoryTest extends TestCase
                 ),
                 '400' => new Model\Response('Invalid input'),
             ],
-            '',
+            'Creates a Dummy resource.',
             'Creates a Dummy resource.',
             null,
             [],
@@ -309,7 +320,7 @@ class OpenApiFactoryTest extends TestCase
                 ),
                 '404' => new Model\Response('Resource not found'),
             ],
-            '',
+            'Retrieves a Dummy resource.',
             'Retrieves a Dummy resource.',
             null,
             [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])]
@@ -330,7 +341,7 @@ class OpenApiFactoryTest extends TestCase
                 '400' => new Model\Response('Invalid input'),
                 '404' => new Model\Response('Resource not found'),
             ],
-            '',
+            'Replaces the Dummy resource.',
             'Replaces the Dummy resource.',
             null,
             [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])],
@@ -350,7 +361,7 @@ class OpenApiFactoryTest extends TestCase
                 '204' => new Model\Response('Dummy resource deleted'),
                 '404' => new Model\Response('Resource not found'),
             ],
-            '',
+            'Removes the Dummy resource.',
             'Removes the Dummy resource.',
             null,
             [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])]
@@ -363,7 +374,7 @@ class OpenApiFactoryTest extends TestCase
             [
                 '404' => new Model\Response('Resource not found'),
             ],
-            '',
+            'Dummy',
             'Custom description',
             null,
             [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])]
@@ -386,7 +397,7 @@ class OpenApiFactoryTest extends TestCase
                 '400' => new Model\Response('Invalid input'),
                 '404' => new Model\Response('Resource not found'),
             ],
-            '',
+            'Replaces the Dummy resource.',
             'Replaces the Dummy resource.',
             null,
             [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])],
@@ -412,7 +423,7 @@ class OpenApiFactoryTest extends TestCase
                     ])),
                 ])),
             ],
-            '',
+            'Retrieves the collection of Dummy resources.',
             'Retrieves the collection of Dummy resources.',
             null,
             [
@@ -456,7 +467,7 @@ class OpenApiFactoryTest extends TestCase
                     ])),
                 ])),
             ],
-            '',
+            'Retrieves the collection of Dummy resources.',
             'Retrieves the collection of Dummy resources.',
             null,
             [
@@ -524,6 +535,9 @@ class OpenApiFactoryTest extends TestCase
         $schemaFactory = new SchemaFactory($typeFactory, $resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new CamelCaseToSnakeCaseNameConverter());
         $typeFactory->setSchemaFactory($schemaFactory);
 
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+
         $factory = new OpenApiFactory(
             $resourceNameCollectionFactoryProphecy->reveal(),
             $resourceMetadataFactory,
@@ -534,6 +548,7 @@ class OpenApiFactoryTest extends TestCase
             $operationPathResolver,
             $filterLocatorProphecy->reveal(),
             $subresourceOperationFactoryProphecy->reveal(),
+            $identifiersExtractorProphecy->reveal(),
             [],
             new Options('Test API', 'This is a test API.', '1.2.3', true, 'oauth2', 'authorizationCode', '/oauth/v2/token', '/oauth/v2/auth', '/oauth/v2/refresh', ['scope param'], [
                 'header' => [
@@ -613,7 +628,11 @@ class OpenApiFactoryTest extends TestCase
         $propertyNameCollectionFactory = $propertyNameCollectionFactoryProphecy->reveal();
         $propertyMetadataFactory = $propertyMetadataFactoryProphecy->reveal();
 
-        $subresourceOperationFactory = new SubresourceOperationFactory($resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new UnderscorePathSegmentNameGenerator());
+        $identifiersExtractorProphecy = $this->prophesize(IdentifiersExtractorInterface::class);
+        $identifiersExtractorProphecy->getIdentifiersFromResourceClass(Argument::type('string'))->willReturn(['id']);
+        $identifiersExtractor = $identifiersExtractorProphecy->reveal();
+
+        $subresourceOperationFactory = new SubresourceOperationFactory($resourceMetadataFactory, $propertyNameCollectionFactory, $propertyMetadataFactory, new UnderscorePathSegmentNameGenerator(), $identifiersExtractor);
 
         $resourceNameCollectionFactoryProphecy = $this->prophesize(ResourceNameCollectionFactoryInterface::class);
         $resourceNameCollectionFactoryProphecy->create()->shouldBeCalled()->willReturn(new ResourceNameCollection([Question::class, Answer::class]));
@@ -633,6 +652,7 @@ class OpenApiFactoryTest extends TestCase
             $operationPathResolver,
             $filterLocatorProphecy->reveal(),
             $subresourceOperationFactory,
+            $identifiersExtractor,
             ['jsonld' => ['application/ld+json']],
             new Options('Test API', 'This is a test API.', '1.2.3', true, 'oauth2', 'authorizationCode', '/oauth/v2/token', '/oauth/v2/auth', '/oauth/v2/refresh', ['scope param'], [
                 'header' => [
@@ -650,7 +670,7 @@ class OpenApiFactoryTest extends TestCase
         $openApi = $factory(['base_url', '/app_dev.php/']);
 
         $paths = $openApi->getPaths();
-        $pathItem = $paths->getPath('/questions/{id}/answer.{_format}');
+        $pathItem = $paths->getPath('/questions/{id}/answer');
 
         $this->assertEquals($pathItem->getGet(), new Model\Operation(
             'api_questions_answer_get_subresourceQuestionSubresource',
@@ -659,11 +679,11 @@ class OpenApiFactoryTest extends TestCase
                 '200' => new Model\Response(
                     'Question resource',
                     new \ArrayObject([
-                        'application/ld+json' => new Model\MediaType(new \ArrayObject(new \ArrayObject(['$ref' => '#/components/schemas/Question']))),
+                        'application/ld+json' => new Model\MediaType(new \ArrayObject(new \ArrayObject(['$ref' => '#/components/schemas/Answer']))),
                     ])
                 ),
             ],
-            '',
+            'Retrieves a Question resource.',
             'Retrieves a Question resource.',
             null,
             [new Model\Parameter('id', 'path', 'Question identifier', true, false, false, ['type' => 'string'])]

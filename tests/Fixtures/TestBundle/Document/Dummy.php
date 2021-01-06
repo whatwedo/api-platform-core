@@ -50,7 +50,7 @@ class Dummy
     /**
      * @var int The id
      *
-     * @ODM\Id(strategy="INCREMENT", type="integer", nullable=true)
+     * @ODM\Id(strategy="INCREMENT", type="int", nullable=true)
      */
     private $id;
 
@@ -94,7 +94,7 @@ class Dummy
     /**
      * @var bool A dummy boolean
      *
-     * @ODM\Field(type="boolean", nullable=true)
+     * @ODM\Field(type="bool", nullable=true)
      */
     public $dummyBoolean;
 
@@ -102,7 +102,7 @@ class Dummy
      * @var \DateTime A dummy date
      *
      * @ODM\Field(type="date", nullable=true)
-     * @Assert\DateTime
+     * @ApiProperty(iri="http://schema.org/DateTime")
      */
     public $dummyDate;
 
