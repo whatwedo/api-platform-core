@@ -51,13 +51,14 @@ final class IdentifierConverter implements ContextAwareIdentifierConverterInterf
     public function convert($data, string $class, array $context = []): array
     {
         if (!\is_array($data)) {
-            @trigger_error(sprintf('Not using an array as the first argument of "%s->convert" is deprecated since API Platform 2.6 and will not be possible anymore in API Platform 3', self::class), E_USER_DEPRECATED);
+            @trigger_error(sprintf('Not using an array as the first argument of "%s->convert" is deprecated since API Platform 2.6 and will not be possible anymore in API Platform 3', self::class), \E_USER_DEPRECATED);
             $data = ['id' => $data];
         }
 
         $identifiers = $data;
-        foreach ($data as $identifier => $value) {
-            if (null === $type = $this->getIdentifierType($class, $identifier)) {
+
+        foreach ($data as $parameter => $value) {
+            if (null === $type = $this->getIdentifierType($context['identifiers'][$parameter][0] ?? $class, $context['identifiers'][$parameter][1] ?? $parameter)) {
                 continue;
             }
 
@@ -68,9 +69,10 @@ final class IdentifierConverter implements ContextAwareIdentifierConverterInterf
                 }
 
                 try {
-                    $identifiers[$identifier] = $identifierTransformer->denormalize($value, $type);
+                    $identifiers[$parameter] = $identifierTransformer->denormalize($value, $type);
+                    break;
                 } catch (InvalidIdentifierException $e) {
-                    throw new InvalidIdentifierException(sprintf('Identifier "%s" could not be denormalized.', $identifier), $e->getCode(), $e);
+                    throw new InvalidIdentifierException(sprintf('Identifier "%s" could not be denormalized.', $parameter), $e->getCode(), $e);
                 }
             }
         }

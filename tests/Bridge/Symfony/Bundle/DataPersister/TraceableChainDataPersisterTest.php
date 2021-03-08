@@ -17,6 +17,7 @@ use ApiPlatform\Core\Bridge\Symfony\Bundle\DataPersister\TraceableChainDataPersi
 use ApiPlatform\Core\DataPersister\ChainDataPersister;
 use ApiPlatform\Core\DataPersister\DataPersisterInterface;
 use ApiPlatform\Core\DataPersister\ResumableDataPersisterInterface;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -24,6 +25,8 @@ use PHPUnit\Framework\TestCase;
  */
 class TraceableChainDataPersisterTest extends TestCase
 {
+    use ProphecyTrait;
+
     /** @dataProvider dataPersisterProvider */
     public function testPersist($persister, $expected)
     {
@@ -38,7 +41,7 @@ class TraceableChainDataPersisterTest extends TestCase
             }
 
             return 0 !== strpos($key, 'class@anonymous');
-        }, ARRAY_FILTER_USE_KEY));
+        }, \ARRAY_FILTER_USE_KEY));
         $this->assertSame($expected, array_values($result));
     }
 
@@ -56,8 +59,19 @@ class TraceableChainDataPersisterTest extends TestCase
             }
 
             return 0 !== strpos($key, 'class@anonymous');
-        }, ARRAY_FILTER_USE_KEY));
+        }, \ARRAY_FILTER_USE_KEY));
         $this->assertSame($expected, array_values($result));
+    }
+
+    public function testSupports()
+    {
+        $context = ['ok' => true];
+        $persister = $this->prophesize(DataPersisterInterface::class);
+        $persister->supports('', $context)->willReturn(true)->shouldBeCalled();
+        $chain = new ChainDataPersister([$persister->reveal()]);
+        $persister->persist('', $context)->shouldBeCalled();
+        $dataPersister = new TraceableChainDataPersister($chain);
+        $dataPersister->persist('', $context);
     }
 
     public function dataPersisterProvider(): iterable

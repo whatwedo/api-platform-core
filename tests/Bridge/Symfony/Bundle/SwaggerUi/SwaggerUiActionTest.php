@@ -23,6 +23,7 @@ use ApiPlatform\Core\OpenApi\Model\Info;
 use ApiPlatform\Core\OpenApi\Model\Paths;
 use ApiPlatform\Core\OpenApi\OpenApi;
 use ApiPlatform\Core\OpenApi\Options;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,6 +36,8 @@ use Twig\Environment as TwigEnvironment;
  */
 class SwaggerUiActionTest extends TestCase
 {
+    use ProphecyTrait;
+
     public const SPEC = [
         'paths' => [
             '/fs' => ['get' => ['operationId' => 'getFCollection']],
@@ -99,6 +102,7 @@ class SwaggerUiActionTest extends TestCase
                     'authorizationUrl' => '',
                     'scopes' => [],
                 ],
+                'extraConfiguration' => [],
                 'shortName' => 'F',
                 'operationId' => 'getFCollection',
                 'id' => null,
@@ -133,6 +137,7 @@ class SwaggerUiActionTest extends TestCase
                     'authorizationUrl' => '',
                     'scopes' => [],
                 ],
+                'extraConfiguration' => [],
                 'shortName' => 'F',
                 'operationId' => 'getFItem',
                 'id' => null,
@@ -185,6 +190,7 @@ class SwaggerUiActionTest extends TestCase
                     'authorizationUrl' => '',
                     'scopes' => [],
                 ],
+                'extraConfiguration' => [],
             ],
         ])->shouldBeCalled()->willReturn('');
 

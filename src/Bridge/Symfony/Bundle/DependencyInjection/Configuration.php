@@ -339,6 +339,14 @@ final class Configuration implements ConfigurationInterface
                                 ->end()
                             ->end()
                         ->end()
+                        ->variableNode('swagger_ui_extra_configuration')
+                            ->defaultValue([])
+                            ->validate()
+                                ->ifTrue(static function ($v) { return false === \is_array($v); })
+                                ->thenInvalid('The swagger_ui_extra_configuration parameter must be an array.')
+                            ->end()
+                            ->info('To pass extra configuration to Swagger UI, like docExpansion or filter.')
+                        ->end()
                     ->end()
                 ->end()
             ->end();
@@ -483,6 +491,7 @@ final class Configuration implements ConfigurationInterface
                                 ->scalarNode('email')->defaultNull()->info('The email address of the contact person/organization. MUST be in the format of an email address.')->end()
                             ->end()
                         ->end()
+                        ->booleanNode('backward_compatibility_layer')->defaultTrue()->info('Enable this to decorate the "api_platform.swagger.normalizer.documentation" instead of decorating the OpenAPI factory.')->end()
                         ->scalarNode('termsOfService')->defaultNull()->info('A URL to the Terms of Service for the API. MUST be in the format of a URL.')->end()
                         ->arrayNode('license')
                         ->addDefaultsIfNotSet()
@@ -490,6 +499,14 @@ final class Configuration implements ConfigurationInterface
                                 ->scalarNode('name')->defaultNull()->info('The license name used for the API.')->end()
                                 ->scalarNode('url')->defaultNull()->info('URL to the license used for the API. MUST be in the format of a URL.')->end()
                             ->end()
+                        ->end()
+                        ->variableNode('swagger_ui_extra_configuration')
+                            ->defaultValue([])
+                            ->validate()
+                                ->ifTrue(static function ($v) { return false === \is_array($v); })
+                                ->thenInvalid('The swagger_ui_extra_configuration parameter must be an array.')
+                            ->end()
+                            ->info('To pass extra configuration to Swagger UI, like docExpansion or filter.')
                         ->end()
                     ->end()
                 ->end()
@@ -522,7 +539,7 @@ final class Configuration implements ConfigurationInterface
                                 }
 
                                 if (\defined($httpStatusCodeConstant = sprintf('%s::%s', Response::class, $httpStatusCode))) {
-                                    @trigger_error(sprintf('Using a string "%s" as a constant of the "%s" class is deprecated since API Platform 2.1 and will not be possible anymore in API Platform 3. Use the Symfony\'s custom YAML extension for PHP constants instead (i.e. "!php/const %s").', $httpStatusCode, Response::class, $httpStatusCodeConstant), E_USER_DEPRECATED);
+                                    @trigger_error(sprintf('Using a string "%s" as a constant of the "%s" class is deprecated since API Platform 2.1 and will not be possible anymore in API Platform 3. Use the Symfony\'s custom YAML extension for PHP constants instead (i.e. "!php/const %s").', $httpStatusCode, Response::class, $httpStatusCodeConstant), \E_USER_DEPRECATED);
 
                                     $httpStatusCode = \constant($httpStatusCodeConstant);
                                 }

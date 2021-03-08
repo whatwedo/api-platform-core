@@ -34,6 +34,7 @@ class DateFilter extends AbstractFilter implements DateFilterInterface
 
     public const DOCTRINE_DATE_TYPES = [
         MongoDbType::DATE => true,
+        MongoDbType::DATE_IMMUTABLE => true,
     ];
 
     /**
@@ -107,8 +108,14 @@ class DateFilter extends AbstractFilter implements DateFilterInterface
     /**
      * Adds the match stage according to the chosen null management.
      */
-    private function addMatch(Builder $aggregationBuilder, string $field, string $operator, string $value, string $nullManagement = null): void
+    private function addMatch(Builder $aggregationBuilder, string $field, string $operator, $value, string $nullManagement = null): void
     {
+        $value = $this->normalizeValue($value, $operator);
+
+        if (null === $value) {
+            return;
+        }
+
         try {
             $value = new \DateTime($value);
         } catch (\Exception $e) {

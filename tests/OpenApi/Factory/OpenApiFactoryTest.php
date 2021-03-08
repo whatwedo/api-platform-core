@@ -30,8 +30,10 @@ use ApiPlatform\Core\Metadata\Resource\ResourceMetadata;
 use ApiPlatform\Core\Metadata\Resource\ResourceNameCollection;
 use ApiPlatform\Core\OpenApi\Factory\OpenApiFactory;
 use ApiPlatform\Core\OpenApi\Model;
+use ApiPlatform\Core\OpenApi\Model\PathItem;
 use ApiPlatform\Core\OpenApi\OpenApi;
 use ApiPlatform\Core\OpenApi\Options;
+use ApiPlatform\Core\OpenApi\Serializer\OpenApiNormalizer;
 use ApiPlatform\Core\Operation\Factory\SubresourceOperationFactory;
 use ApiPlatform\Core\Operation\Factory\SubresourceOperationFactoryInterface;
 use ApiPlatform\Core\Operation\UnderscorePathSegmentNameGenerator;
@@ -41,6 +43,7 @@ use ApiPlatform\Core\Tests\Fixtures\DummyFilter;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Answer;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Dummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Question;
+use ApiPlatform\Core\Tests\ProphecyTrait;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Psr\Container\ContainerInterface;
@@ -48,10 +51,15 @@ use Symfony\Component\PropertyInfo\Type;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
+use Symfony\Component\Serializer\Serializer;
 
 class OpenApiFactoryTest extends TestCase
 {
+    use ProphecyTrait;
+
     private const OPERATION_FORMATS = [
         'input_formats' => ['jsonld' => ['application/ld+json']],
         'output_formats' => ['jsonld' => ['application/ld+json']],
@@ -67,7 +75,29 @@ class OpenApiFactoryTest extends TestCase
                 'get' => ['method' => 'GET'] + self::OPERATION_FORMATS,
                 'put' => ['method' => 'PUT'] + self::OPERATION_FORMATS,
                 'delete' => ['method' => 'DELETE'] + self::OPERATION_FORMATS,
-                'custom' => ['method' => 'HEAD', 'path' => '/foo/{id}', 'openapi_context' => ['description' => 'Custom description']] + self::OPERATION_FORMATS,
+                'custom' => ['method' => 'HEAD', 'path' => '/foo/{id}', 'openapi_context' => [
+                    'description' => 'Custom description',
+                    'parameters' => [
+                        ['description' => 'Test parameter', 'name' => 'param', 'in' => 'path', 'type' => 'string', 'required' => true, 'default' => 'BOTH'],
+                    ],
+                    'requestBody' => [
+                        'required' => true,
+                        'description' => 'Custom request body',
+                        'content' => [
+                            'multipart/form-data' => [
+                                'schema' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'file' => [
+                                            'type' => 'string',
+                                            'format' => 'binary',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]] + self::OPERATION_FORMATS,
                 'formats' => ['method' => 'PUT', 'path' => '/formatted/{id}', 'output_formats' => ['json' => ['application/json'], 'csv' => ['text/csv']], 'input_formats' => ['json' => ['application/json'], 'csv' => ['text/csv']]],
             ],
             [
@@ -227,7 +257,7 @@ class OpenApiFactoryTest extends TestCase
         $this->assertEquals($components->getSchemas(), new \ArrayObject(['Dummy' => $dummySchema->getDefinitions()]));
 
         $this->assertEquals($components->getSecuritySchemes(), new \ArrayObject([
-            'oauth' => new Model\SecurityScheme('oauth2', 'OAuth 2.0 authorization code Grant', null, null, 'oauth2', null, new Model\OAuthFlows(null, null, null, new Model\OAuthFlow('/oauth/v2/auth', '/oauth/v2/token', '/oauth/v2/refresh', new \ArrayObject(['scope param'])))),
+            'oauth' => new Model\SecurityScheme('oauth2', 'OAuth 2.0 authorization code Grant', null, null, null, null, new Model\OAuthFlows(null, null, null, new Model\OAuthFlow('/oauth/v2/auth', '/oauth/v2/token', '/oauth/v2/refresh', new \ArrayObject(['scope param'])))),
             'header' => new Model\SecurityScheme('apiKey', 'Value for the Authorization header parameter.', 'Authorization', 'header'),
             'query' => new Model\SecurityScheme('apiKey', 'Value for the key query parameter.', 'key', 'query'),
         ]));
@@ -288,6 +318,7 @@ class OpenApiFactoryTest extends TestCase
                     new \ArrayObject(['GetDummyItem' => new Model\Link('getDummyItem', new \ArrayObject(['id' => '$response.body#/id']), [], 'The `id` value returned in the response can be used as the `id` parameter in `GET /dummies/{id}`.')])
                 ),
                 '400' => new Model\Response('Invalid input'),
+                '422' => new Model\Response('Unprocessable entity'),
             ],
             'Creates a Dummy resource.',
             'Creates a Dummy resource.',
@@ -339,6 +370,7 @@ class OpenApiFactoryTest extends TestCase
                     new \ArrayObject(['GetDummyItem' => new Model\Link('getDummyItem', new \ArrayObject(['id' => '$response.body#/id']), [], 'The `id` value returned in the response can be used as the `id` parameter in `GET /dummies/{id}`.')])
                 ),
                 '400' => new Model\Response('Invalid input'),
+                '422' => new Model\Response('Unprocessable entity'),
                 '404' => new Model\Response('Resource not found'),
             ],
             'Replaces the Dummy resource.',
@@ -377,7 +409,20 @@ class OpenApiFactoryTest extends TestCase
             'Dummy',
             'Custom description',
             null,
-            [new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])]
+            [new Model\Parameter('param', 'path', 'Test parameter', true), new Model\Parameter('id', 'path', 'Resource identifier', true, false, false, ['type' => 'string'])],
+            new Model\RequestBody('Custom request body', new \ArrayObject([
+                'multipart/form-data' => [
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'file' => [
+                                'type' => 'string',
+                                'format' => 'binary',
+                            ],
+                        ],
+                    ],
+                ],
+            ]), true)
         ));
 
         $formattedPath = $paths->getPath('/formatted/{id}');
@@ -395,6 +440,7 @@ class OpenApiFactoryTest extends TestCase
                     new \ArrayObject(['GetDummyItem' => new Model\Link('getDummyItem', new \ArrayObject(['id' => '$response.body#/id']), [], 'The `id` value returned in the response can be used as the `id` parameter in `GET /dummies/{id}`.')])
                 ),
                 '400' => new Model\Response('Invalid input'),
+                '422' => new Model\Response('Unprocessable entity'),
                 '404' => new Model\Response('Resource not found'),
             ],
             'Replaces the Dummy resource.',
@@ -451,6 +497,7 @@ class OpenApiFactoryTest extends TestCase
                 ], 'deepObject', true),
                 new Model\Parameter('order[name]', 'query', '', false, false, true, [
                     'type' => 'string',
+                    'enum' => ['asc', 'desc'],
                 ]),
             ]
         ));
@@ -670,7 +717,7 @@ class OpenApiFactoryTest extends TestCase
         $openApi = $factory(['base_url', '/app_dev.php/']);
 
         $paths = $openApi->getPaths();
-        $pathItem = $paths->getPath('/questions/{id}/answer');
+        $pathItem = $paths->getPath('/api/questions/{id}/answer');
 
         $this->assertEquals($pathItem->getGet(), new Model\Operation(
             'api_questions_answer_get_subresourceQuestionSubresource',
@@ -688,5 +735,31 @@ class OpenApiFactoryTest extends TestCase
             null,
             [new Model\Parameter('id', 'path', 'Question identifier', true, false, false, ['type' => 'string'])]
         ));
+
+        $encoders = [new JsonEncoder()];
+        $normalizers = [new ObjectNormalizer()];
+
+        $serializer = new Serializer($normalizers, $encoders);
+        $normalizers[0]->setSerializer($serializer);
+
+        // Call the normalizer to see if everything is smooth
+        $normalizer = new OpenApiNormalizer($normalizers[0]);
+        $normalizer->normalize($openApi);
+    }
+
+    public function testResetPathItem()
+    {
+        $pathItem = new PathItem();
+        $pathItem->withGet(null);
+        $pathItem->withDelete(null);
+        $pathItem->withPost(null);
+        $pathItem->withPut(null);
+        $pathItem->withPatch(null);
+
+        $this->assertNull($pathItem->getGet());
+        $this->assertNull($pathItem->getDelete());
+        $this->assertNull($pathItem->getPost());
+        $this->assertNull($pathItem->getPut());
+        $this->assertNull($pathItem->getPatch());
     }
 }

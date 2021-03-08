@@ -150,15 +150,15 @@
 
         <!-- Event listeners -->
 
-        <!-- kernel.request priority must be < 8 to be executed after the Firewall -->
         <service id="api_platform.listener.request.add_format" class="ApiPlatform\Core\EventListener\AddFormatListener">
             <argument type="service" id="api_platform.negotiator" />
             <argument type="service" id="api_platform.metadata.resource.metadata_factory" />
             <argument>%api_platform.formats%</argument>
 
-            <tag name="kernel.event_listener" event="kernel.request" method="onKernelRequest" priority="7" />
+            <tag name="kernel.event_listener" event="kernel.request" method="onKernelRequest" priority="28" />
         </service>
 
+        <!-- kernel.request priority must be < 8 to be executed after the Firewall -->
         <service id="api_platform.listener.request.read" class="ApiPlatform\Core\EventListener\ReadListener">
             <argument type="service" id="api_platform.collection_data_provider" />
             <argument type="service" id="api_platform.item_data_provider" />
@@ -242,7 +242,7 @@
             <argument>%api_platform.version%</argument>
             <argument>null</argument>
             <argument on-invalid="null">%api_platform.swagger.versions%</argument>
-            <argument type="service" id="api_platform.openapi.factory"></argument>
+            <argument type="service" id="api_platform.openapi.factory" on-invalid="null"></argument>
         </service>
 
         <service id="api_platform.action.exception" class="ApiPlatform\Core\Action\ExceptionAction" public="true">
@@ -275,11 +275,11 @@
         </service>
 
         <service id="api_platform.identifier.integer" class="ApiPlatform\Core\Identifier\Normalizer\IntegerDenormalizer" public="false">
-            <tag name="api_platform.identifier.denormalizer" />
+            <tag name="api_platform.identifier.denormalizer" priority="-100" />
         </service>
 
         <service id="api_platform.identifier.date_normalizer" class="ApiPlatform\Core\Identifier\Normalizer\DateTimeIdentifierDenormalizer" public="false">
-            <tag name="api_platform.identifier.denormalizer" />
+            <tag name="api_platform.identifier.denormalizer" priority="-100" />
         </service>
 
         <!-- Subresources -->

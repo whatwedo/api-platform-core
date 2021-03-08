@@ -41,7 +41,7 @@ final class IdentifiersExtractor implements IdentifiersExtractorInterface
         $this->resourceClassResolver = $resourceClassResolver;
 
         if (null === $this->resourceClassResolver) {
-            @trigger_error(sprintf('Not injecting %s in the IdentifiersExtractor might introduce cache issues with object identifiers.', ResourceClassResolverInterface::class), E_USER_DEPRECATED);
+            @trigger_error(sprintf('Not injecting %s in the IdentifiersExtractor might introduce cache issues with object identifiers.', ResourceClassResolverInterface::class), \E_USER_DEPRECATED);
         }
     }
 
@@ -62,7 +62,7 @@ final class IdentifiersExtractor implements IdentifiersExtractorInterface
                 return ['id'];
             }
 
-            throw new RuntimeException(sprintf('No identifier defined "%s". You should add #[\ApiPlatform\Core\Annotation\ApiProperty(identifier: true)]" on the property identifying the resource."', $resourceClass));
+            throw new RuntimeException(sprintf('No identifier defined in "%s". You should add #[\ApiPlatform\Core\Annotation\ApiProperty(identifier: true)]" on the property identifying the resource."', $resourceClass));
         }
 
         return $identifiers;

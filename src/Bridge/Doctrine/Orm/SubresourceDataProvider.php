@@ -26,6 +26,7 @@ use ApiPlatform\Core\Exception\RuntimeException;
 use ApiPlatform\Core\Identifier\IdentifierConverterInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyMetadataFactoryInterface;
 use ApiPlatform\Core\Metadata\Property\Factory\PropertyNameCollectionFactoryInterface;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceMetadataFactoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
 use Doctrine\ORM\QueryBuilder;
@@ -48,11 +49,12 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
      * @param QueryCollectionExtensionInterface[] $collectionExtensions
      * @param QueryItemExtensionInterface[]       $itemExtensions
      */
-    public function __construct(ManagerRegistry $managerRegistry, PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, iterable $collectionExtensions = [], iterable $itemExtensions = [])
+    public function __construct(ManagerRegistry $managerRegistry, PropertyNameCollectionFactoryInterface $propertyNameCollectionFactory, PropertyMetadataFactoryInterface $propertyMetadataFactory, iterable $collectionExtensions = [], iterable $itemExtensions = [], ResourceMetadataFactoryInterface $resourceMetadataFactory = null)
     {
         $this->managerRegistry = $managerRegistry;
         $this->propertyNameCollectionFactory = $propertyNameCollectionFactory;
         $this->propertyMetadataFactory = $propertyMetadataFactory;
+        $this->resourceMetadataFactory = $resourceMetadataFactory;
         $this->collectionExtensions = $collectionExtensions;
         $this->itemExtensions = $itemExtensions;
     }
@@ -136,7 +138,7 @@ final class SubresourceDataProvider implements SubresourceDataProviderInterface
             $identifierResourceClass = $context['identifiers'][$identifier][0];
             $previousAssociationProperty = $contextIdentifiers[$remainingIdentifiers] ?? $context['property'];
         } else {
-            @trigger_error('Identifiers should match the convention introduced in ADR 0001-resource-identifiers, this behavior will be removed in 3.0.', E_USER_DEPRECATED);
+            @trigger_error('Identifiers should match the convention introduced in ADR 0001-resource-identifiers, this behavior will be removed in 3.0.', \E_USER_DEPRECATED);
             [$identifier, $identifierResourceClass] = $context['identifiers'][$remainingIdentifiers - 1];
             $previousAssociationProperty = $context['identifiers'][$remainingIdentifiers][0] ?? $context['property'];
         }

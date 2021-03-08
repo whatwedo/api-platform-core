@@ -41,7 +41,6 @@ use ApiPlatform\Core\GraphQl\Type\Definition\TypeInterface as GraphQlTypeInterfa
 use Doctrine\Common\Annotations\Annotation;
 use phpDocumentor\Reflection\DocBlockFactoryInterface;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\BrowserKit\AbstractBrowser;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Config\Resource\DirectoryResource;
@@ -53,7 +52,6 @@ use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Finder\Finder;
-use Symfony\Component\HttpClient\HttpClientTrait;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
 use Symfony\Component\Uid\AbstractUid;
@@ -138,14 +136,6 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             ->addTag('api_platform.subresource_data_provider');
         $container->registerForAutoconfiguration(FilterInterface::class)
             ->addTag('api_platform.filter');
-
-        if ($container->hasParameter('test.client.parameters')) {
-            $loader->load('test.xml');
-
-            if (!class_exists(AbstractBrowser::class) || !trait_exists(HttpClientTrait::class)) {
-                $container->removeDefinition('test.api_platform.client');
-            }
-        }
     }
 
     private function registerCommonConfiguration(ContainerBuilder $container, array $config, XmlFileLoader $loader, array $formats, array $patchFormats, array $errorFormats): void
@@ -195,7 +185,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.collection.exists_parameter_name', $config['collection']['exists_parameter_name']);
         $container->setParameter('api_platform.collection.order', $config['defaults']['order'] ?? $config['collection']['order']);
         $container->setParameter('api_platform.collection.order_parameter_name', $config['collection']['order_parameter_name']);
-        $container->setParameter('api_platform.collection.pagination.enabled', $this->isConfigEnabled($container, $config['defaults']['pagination_enabled'] ?? $config['collection']['pagination']));
+        $container->setParameter('api_platform.collection.pagination.enabled', $config['defaults']['pagination_enabled'] ?? $this->isConfigEnabled($container, $config['collection']['pagination']));
         $container->setParameter('api_platform.collection.pagination.partial', $config['defaults']['pagination_partial'] ?? $config['collection']['pagination']['partial']);
         $container->setParameter('api_platform.collection.pagination.client_enabled', $config['defaults']['pagination_client_enabled'] ?? $config['collection']['pagination']['client_enabled']);
         $container->setParameter('api_platform.collection.pagination.client_items_per_page', $config['defaults']['pagination_client_items_per_page'] ?? $config['collection']['pagination']['client_items_per_page']);
@@ -385,13 +375,18 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
     {
         $container->setParameter('api_platform.swagger.versions', $config['swagger']['versions']);
 
-        if (empty($config['swagger']['versions'])) {
-            return;
+        if (!$config['enable_swagger'] && $config['enable_swagger_ui']) {
+            throw new RuntimeException('You can not enable the Swagger UI without enabling Swagger, fix this by enabling swagger via the configuration "enable_swagger: true".');
         }
 
         $loader->load('json_schema.xml');
-        $loader->load('swagger.xml');
+
+        if (!$config['enable_swagger']) {
+            return;
+        }
+
         $loader->load('openapi.xml');
+        $loader->load('swagger.xml');
         $loader->load('swagger-ui.xml');
 
         if (!$config['enable_swagger_ui'] && !$config['enable_re_doc']) {
@@ -402,6 +397,11 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
         $container->setParameter('api_platform.enable_swagger_ui', $config['enable_swagger_ui']);
         $container->setParameter('api_platform.enable_re_doc', $config['enable_re_doc']);
         $container->setParameter('api_platform.swagger.api_keys', $config['swagger']['api_keys']);
+        $container->setParameter('api_platform.swagger_ui.extra_configuration', $config['openapi']['swagger_ui_extra_configuration'] ?? $config['swagger']['swagger_ui_extra_configuration']);
+
+        if (true === $config['openapi']['backward_compatibility_layer']) {
+            $container->getDefinition('api_platform.swagger.normalizer.documentation')->addArgument($container->getDefinition('api_platform.openapi.normalizer'));
+        }
     }
 
     private function registerJsonApiConfiguration(array $formats, XmlFileLoader $loader): void
@@ -508,7 +508,7 @@ final class ApiPlatformExtension extends Extension implements PrependExtensionIn
             return;
         }
 
-        @trigger_error('The "api_platform.metadata_cache" parameter is deprecated since version 2.4 and will have no effect in 3.0.', E_USER_DEPRECATED);
+        @trigger_error('The "api_platform.metadata_cache" parameter is deprecated since version 2.4 and will have no effect in 3.0.', \E_USER_DEPRECATED);
 
         // BC
         if (!$container->getParameter('api_platform.metadata_cache')) {

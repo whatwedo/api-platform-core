@@ -42,6 +42,8 @@ use Symfony\Component\Serializer\SerializerInterface;
  */
 final class PublishMercureUpdatesListener
 {
+    use DispatchTrait;
+    use ResourceClassInfoTrait;
     private const ALLOWED_KEYS = [
         'topics' => true,
         'data' => true,
@@ -51,9 +53,6 @@ final class PublishMercureUpdatesListener
         'retry' => true,
         'normalization_context' => true,
     ];
-
-    use DispatchTrait;
-    use ResourceClassInfoTrait;
 
     private $iriConverter;
     private $serializer;
@@ -193,7 +192,7 @@ final class PublishMercureUpdatesListener
                     throw new \InvalidArgumentException('Targets do not exist anymore since Mercure 0.10. Mark the update as private instead or downgrade the Mercure Component to version 0.3');
                 }
 
-                @trigger_error('Targets do not exist anymore since Mercure 0.10. Mark the update as private instead.', E_USER_DEPRECATED);
+                @trigger_error('Targets do not exist anymore since Mercure 0.10. Mark the update as private instead.', \E_USER_DEPRECATED);
                 break;
             }
 
@@ -225,7 +224,7 @@ final class PublishMercureUpdatesListener
             // and I'm not a fond of this approach.
             $iri = $options['topics'] ?? $object->iri;
             /** @var string $data */
-            $data = $options['data'] ?? json_encode(['@id' => $object->id]);
+            $data = json_encode(['@id' => $object->id]);
         } else {
             $resourceClass = $this->getObjectClass($object);
             $context = $options['normalization_context'] ?? $this->resourceMetadataFactory->create($resourceClass)->getAttribute('normalization_context', []);

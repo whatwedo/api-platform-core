@@ -244,6 +244,7 @@ class ApiPlatformExtensionTest extends TestCase
         $containerBuilderProphecy->hasParameter('kernel.debug')->willReturn(true);
         $containerBuilderProphecy->getParameter('kernel.debug')->willReturn(false);
         $containerBuilderProphecy->setAlias('api_platform.name_converter', $nameConverterId)->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.swagger_ui.extra_configuration', [])->shouldBeCalled();
 
         $containerBuilder = $containerBuilderProphecy->reveal();
 
@@ -786,6 +787,26 @@ class ApiPlatformExtensionTest extends TestCase
         $this->extension->load($config, $containerBuilder);
     }
 
+    public function testDisabledPaginationViaDefaults()
+    {
+        $config = self::DEFAULT_CONFIG;
+        $config['api_platform']['defaults'] = [
+            'pagination_enabled' => false,
+        ];
+
+        $containerBuilderProphecy = $this->getBaseContainerBuilderProphecy();
+        $containerBuilderProphecy->setParameter('api_platform.collection.pagination', [
+            'enabled' => false, 'partial' => false, 'client_enabled' => false, 'client_items_per_page' => false, 'client_partial' => false, 'items_per_page' => 30, 'maximum_items_per_page' => null, 'page_parameter_name' => 'page', 'enabled_parameter_name' => 'pagination', 'items_per_page_parameter_name' => 'itemsPerPage', 'partial_parameter_name' => 'partial', ])->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.collection.pagination', [
+            'enabled' => true, 'partial' => false, 'client_enabled' => false, 'client_items_per_page' => false, 'client_partial' => false, 'items_per_page' => 30, 'maximum_items_per_page' => null, 'page_parameter_name' => 'page', 'enabled_parameter_name' => 'pagination', 'items_per_page_parameter_name' => 'itemsPerPage', 'partial_parameter_name' => 'partial', ])->shouldNotBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.collection.pagination.enabled', false)->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.collection.pagination.enabled', true)->shouldNotBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => ['pagination_enabled' => false]])->shouldBeCalled();
+        $containerBuilderProphecy->setParameter('api_platform.defaults', ['attributes' => []])->shouldNotBeCalled();
+        $containerBuilder = $containerBuilderProphecy->reveal();
+        $this->extension->load($config, $containerBuilder);
+    }
+
     private function getPartialContainerBuilderProphecy($configuration = null)
     {
         $parameterBag = new EnvPlaceholderParameterBag();
@@ -1152,6 +1173,7 @@ class ApiPlatformExtensionTest extends TestCase
         if ($hasSwagger) {
             $parameters['api_platform.swagger.versions'] = [2, 3];
             $parameters['api_platform.swagger.api_keys'] = [];
+            $parameters['api_platform.swagger_ui.extra_configuration'] = [];
         } else {
             $parameters['api_platform.swagger.versions'] = [];
         }
@@ -1159,7 +1181,6 @@ class ApiPlatformExtensionTest extends TestCase
         foreach ($parameters as $key => $value) {
             $containerBuilderProphecy->setParameter($key, $value)->shouldBeCalled();
         }
-        $containerBuilderProphecy->hasParameter('test.client.parameters')->wilLReturn(true);
 
         foreach (['yaml', 'xml'] as $format) {
             $definitionProphecy = $this->prophesize(Definition::class);
@@ -1241,6 +1262,9 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.http_cache.listener.response.configure',
             'api_platform.http_cache.purger.varnish_client',
             'api_platform.http_cache.purger.varnish',
+            'api_platform.json_schema.json_schema_generate_command',
+            'api_platform.json_schema.type_factory',
+            'api_platform.json_schema.schema_factory',
             'api_platform.listener.view.validate',
             'api_platform.listener.view.validate_query_parameters',
             'api_platform.mercure.listener.response.add_link_header',
@@ -1270,7 +1294,6 @@ class ApiPlatformExtensionTest extends TestCase
             'api_platform.swagger.listener.ui',
             'api_platform.validator',
             'api_platform.validator.query_parameter_validator',
-            'test.api_platform.client',
         ];
 
         if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
@@ -1307,9 +1330,6 @@ class ApiPlatformExtensionTest extends TestCase
             $definitions[] = 'api_platform.swagger.command.swagger_command';
             $definitions[] = 'api_platform.swagger.normalizer.api_gateway';
             $definitions[] = 'api_platform.swagger.normalizer.documentation';
-            $definitions[] = 'api_platform.json_schema.type_factory';
-            $definitions[] = 'api_platform.json_schema.schema_factory';
-            $definitions[] = 'api_platform.json_schema.json_schema_generate_command';
             $definitions[] = 'api_platform.openapi.options';
             $definitions[] = 'api_platform.openapi.normalizer';
             $definitions[] = 'api_platform.openapi.normalizer.api_gateway';
@@ -1344,6 +1364,13 @@ class ApiPlatformExtensionTest extends TestCase
             $definitions[] = 'api_platform.jsonld.normalizer.object';
         }
 
+        // Ignore inlined services
+        $containerBuilderProphecy->setDefinition(Argument::that(static function (string $arg) {
+            return 0 === strpos($arg, '.');
+        }), Argument::type(Definition::class))->should(function () {
+            return true;
+        });
+
         foreach ($definitions as $definition) {
             $containerBuilderProphecy->setDefinition($definition, Argument::type(Definition::class))->shouldBeCalled();
         }
@@ -1365,6 +1392,8 @@ class ApiPlatformExtensionTest extends TestCase
             NumericFilter::class => 'api_platform.doctrine.orm.numeric_filter',
             ExistsFilter::class => 'api_platform.doctrine.orm.exists_filter',
             GraphQlSerializerContextBuilderInterface::class => 'api_platform.graphql.serializer.context_builder',
+            TypeFactoryInterface::class => 'api_platform.json_schema.type_factory',
+            SchemaFactoryInterface::class => 'api_platform.json_schema.schema_factory',
         ];
 
         if (\in_array('odm', $doctrineIntegrationsToLoad, true)) {
@@ -1385,8 +1414,6 @@ class ApiPlatformExtensionTest extends TestCase
         // Only when swagger is enabled
         if ($hasSwagger) {
             $aliases += [
-                TypeFactoryInterface::class => 'api_platform.json_schema.type_factory',
-                SchemaFactoryInterface::class => 'api_platform.json_schema.schema_factory',
                 Options::class => 'api_platform.openapi.options',
                 OpenApiNormalizer::class => 'api_platform.openapi.normalizer',
                 OpenApiFactoryInterface::class => 'api_platform.openapi.factory',

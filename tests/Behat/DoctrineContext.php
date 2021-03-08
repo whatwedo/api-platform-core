@@ -45,6 +45,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoOutputFallbackTo
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyDtoOutputSameClass as DummyDtoOutputSameClassDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyFriend as DummyFriendDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyGroup as DummyGroupDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyImmutableDate as DummyImmutableDateDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyMercure as DummyMercureDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyOffer as DummyOfferDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\DummyProduct as DummyProductDocument;
@@ -80,6 +81,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\Taxon as TaxonDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\ThirdLevel as ThirdLevelDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\UrlEncodedId as UrlEncodedIdDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\User as UserDocument;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Document\WithJsonDummy as WithJsonDummyDocument;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\AbsoluteUrlRelationDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Address;
@@ -139,6 +141,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\PersonToPet;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Pet;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Product;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\Question;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RamseyUuidBinaryDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RamseyUuidDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedDummy;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\RelatedOwnedDummy;
@@ -153,6 +156,7 @@ use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\ThirdLevel;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UrlEncodedId;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\User;
 use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\UuidIdentifierDummy;
+use ApiPlatform\Core\Tests\Fixtures\TestBundle\Entity\WithJsonDummy;
 use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
 use Doctrine\ODM\MongoDB\DocumentManager;
@@ -565,6 +569,21 @@ final class DoctrineContext implements Context
             $dummy->setAlias('Alias #'.($nb - $i));
             $dummy->setJsonData(['foo' => ['bar', 'baz'], 'bar' => 5]);
             $dummy->setArrayData(['foo', 'bar', 'baz']);
+
+            $this->manager->persist($dummy);
+        }
+
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there are :nb dummy with null JSON objects
+     */
+    public function thereAreDummyWithNullJsonObjects(int $nb)
+    {
+        for ($i = 1; $i <= $nb; ++$i) {
+            $dummy = $this->buildWithJsonDummy();
+            $dummy->json = null;
 
             $this->manager->persist($dummy);
         }
@@ -1270,7 +1289,7 @@ final class DoctrineContext implements Context
     {
         for ($i = 1; $i <= $nb; ++$i) {
             $date = new \DateTimeImmutable(sprintf('2015-04-%d', $i), new \DateTimeZone('UTC'));
-            $dummy = new DummyImmutableDate();
+            $dummy = $this->buildDummyImmutableDate();
             $dummy->dummyDate = $date;
 
             $this->manager->persist($dummy);
@@ -1302,6 +1321,35 @@ final class DoctrineContext implements Context
         $dummy = new RamseyUuidDummy();
         $dummy->setId($uuid);
 
+        $this->manager->persist($dummy);
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is a ramsey identified resource with binary uuid :uuid
+     */
+    public function thereIsARamseyIdentifiedResourceWithBinaryUuid(string $uuid)
+    {
+        $dummy = new RamseyUuidBinaryDummy();
+        $dummy->setId($uuid);
+
+        $this->manager->persist($dummy);
+        $this->manager->flush();
+    }
+
+    /**
+     * @Given there is a ramsey identified resource with binary uuid :uuid having a related resource with binary uuid :uuid_related
+     */
+    public function thereIsARamseyIdentifiedResourceWithBinaryUuidHavingARelatedResourceWithBinaryUuid(string $uuid, string $uuidRelated)
+    {
+        $related = new RamseyUuidBinaryDummy();
+        $related->setId($uuidRelated);
+
+        $dummy = new RamseyUuidBinaryDummy();
+        $dummy->setId($uuid);
+        $dummy->addRelated($related);
+
+        $this->manager->persist($related);
         $this->manager->persist($dummy);
         $this->manager->flush();
     }
@@ -1802,6 +1850,14 @@ final class DoctrineContext implements Context
     }
 
     /**
+     * @return DummyImmutableDate|DummyImmutableDateDocument
+     */
+    private function buildDummyImmutableDate()
+    {
+        return $this->isOrm() ? new DummyImmutableDate() : new DummyImmutableDateDocument();
+    }
+
+    /**
      * @return DummyDifferentGraphQlSerializationGroup|DummyDifferentGraphQlSerializationGroupDocument
      */
     private function buildDummyDifferentGraphQlSerializationGroup()
@@ -2159,5 +2215,13 @@ final class DoctrineContext implements Context
     private function buildCustomMultipleIdentifierDummy()
     {
         return $this->isOrm() ? new CustomMultipleIdentifierDummy() : new CustomMultipleIdentifierDummyDocument();
+    }
+
+    /**
+     * @return WithJsonDummy|WithJsonDummyDocument
+     */
+    private function buildWithJsonDummy()
+    {
+        return $this->isOrm() ? new WithJsonDummy() : new WithJsonDummyDocument();
     }
 }
